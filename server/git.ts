@@ -10,6 +10,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
+import { rememberUnmergedPaths, rememberConflictCommit, unresolvedPaths, clearConflictState } from './gitConflictState.js';
 
 /**
  * Never staged: server/storage.ts writeFileAtomic's temp files
@@ -91,6 +92,7 @@ export async function initWithCommit(dir: string, message: string): Promise<void
 
 /** Stages everything and commits if there are changes. Returns whether a commit was made. Committer is always Folio's fixed identity; `author` (a real person, or Folio itself for system commits) is passed via --author, never written to config. */
 export async function commitAll(dir: string, message: string, author: GitIdentity): Promise<boolean> {
+  await rememberUnmergedPaths(dir);
   await execGit(dir, ['add', '-A', '--', '.', ATOMIC_TEMP_PATHSPEC]);
   const { stdout } = await execGit(dir, ['status', '--porcelain', '--untracked-files=no']);
   if (!stdout.trim()) return false;
@@ -464,7 +466,11 @@ export async function fetch(dir: string, askpassScript?: string, spaceSlug?: str
 }
 
 export async function push(dir: string, branch: string, askpassScript?: string, spaceSlug?: string): Promise<void> {
+  if ((await unresolvedPaths(dir)).length > 0) {
+    throw new GitError(['push'], 'unresolved Git conflicts remain; edit the affected files or take the version from Git');
+  }
   await execGit(dir, ['push', 'origin', `HEAD:${branch}`], remoteAuthEnv(askpassScript, spaceSlug));
+  await clearConflictState(dir);
 }
 
 /**
@@ -531,9 +537,11 @@ export async function mergeFetchedRemote(
 }
 
 /** Commits whatever is currently on disk (including unresolved conflict markers) as-is — used right after a conflicted merge. */
-export async function commitConflictState(dir: string): Promise<void> {
+export async function commitConflictState(dir: string, deferResolutionBaseline = false): Promise<void> {
+  await rememberUnmergedPaths(dir);
   await execGit(dir, ['add', '-A', '--', '.', ATOMIC_TEMP_PATHSPEC]);
   await execGit(dir, ['-c', `user.name=${FOLIO_COMMITTER.name}`, '-c', `user.email=${FOLIO_COMMITTER.email}`, 'commit', '-m', 'merge with conflicts']);
+  if (!deferResolutionBaseline) await rememberConflictCommit(dir);
 }
 
 /** `git rev-parse HEAD`. */
@@ -718,7 +726,8 @@ export async function fileSizeAt(dir: string, sha: string, relPath: string, askp
  * by multiple spaces, used to go unnoticed and get pushed) that still has an
  * unresolved git conflict marker at the start of a line.
  *
- * `git grep -l -E '^<<<<<<< |^>>>>>>> '` rather than hasConflictMarkers's own
+ * Retained conflict paths also cover deletions and binary files. The marker
+ * scan uses `git grep -l -z -E '^<<<<<<< |^>>>>>>> '` rather than hasConflictMarkers's own
  * hand-rolled fs walk: grep is git's own notion of "tracked file" (no need
  * to hand-maintain the .md/.excalidraw.svg extension list or reimplement
  * .gitignore-ish skipping), and it is git's own conflict-marker convention
@@ -731,17 +740,17 @@ export async function fileSizeAt(dir: string, sha: string, relPath: string, askp
  * report as a GitError — this treats "exit 1, no stderr" as the clean "no
  * conflicts" case and only re-throws a genuine failure.
  */
+export { unresolvedPaths as unresolvedConflictPaths, clearConflictState as clearResolvedConflictState, rememberConflictCommit as completeConflictSnapshot } from './gitConflictState.js';
+
 export async function listConflictedFiles(dir: string): Promise<string[]> {
-  const args = ['grep', '-l', '-E', '^<<<<<<< |^>>>>>>> '];
+  const retained = await unresolvedPaths(dir);
+  const args = ['grep', '-l', '-z', '-E', '^<<<<<<< |^>>>>>>> '];
   try {
     const { stdout } = await execFileAsync('git', args, { cwd: dir, timeout: GIT_TIMEOUT_MS, maxBuffer: MAX_BUFFER });
-    return stdout
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
+    return [...new Set([...retained, ...stdout.split('\0').filter(Boolean)])].sort();
   } catch (err) {
     const e = err as { code?: number; stdout?: string; stderr?: string; message?: string };
-    if (e.code === 1 && !e.stderr?.trim()) return []; // no matches — not a failure
+    if (e.code === 1 && !e.stderr?.trim()) return retained; // no matches — not a failure
     throw new GitError(args, e.stderr?.trim() || e.message || String(err));
   }
 }
@@ -785,11 +794,8 @@ export async function filesDifferingFromRemote(
   askpassScript?: string,
   spaceSlug?: string,
 ): Promise<string[]> {
-  const { stdout } = await execGit(dir, ['diff', '--name-only', `origin/${branch}`], remoteAuthEnv(askpassScript, spaceSlug));
-  return stdout
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
+  const { stdout } = await execGit(dir, ['diff', '--name-only', '-z', `origin/${branch}`], remoteAuthEnv(askpassScript, spaceSlug));
+  return stdout.split('\0').filter(Boolean);
 }
 
 export async function resetToRemote(
@@ -841,6 +847,7 @@ export async function resetToRemote(
 
   await execGit(dir, ['reset', '--hard', `origin/${branch}`], env);
   await execGit(dir, ['clean', '-fd'], env);
+  await clearConflictState(dir);
 
   return { backupRef, changed };
 }
