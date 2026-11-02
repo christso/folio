@@ -1,5 +1,9 @@
 # Folio
 
+This is the deployment fork at [christso/folio](https://github.com/christso/folio).
+Our changes live on `deployment`; `main` stays at the upstream baseline.
+See [Fork maintenance](#fork-maintenance) for the patch list, recovery limits and update steps.
+
 **The vibe-coded, open-source alternative to Notion and Confluence.**
 Your team's wiki lives in Git. People write in the browser, together, in real
 time. AI agents read and write the same pages. One command to run it yourself.
@@ -947,3 +951,99 @@ vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 ## License
 
 [MIT](LICENSE)
+
+
+## Fork maintenance
+
+This fork follows [evergreen-it-dev/folio](https://github.com/evergreen-it-dev/folio).
+The current upstream base is `9a4b30b9065fa1dc05b8bcec2fe75f7710a430cf`
+(package version 0.4.2). `main` tracks upstream; `deployment` contains the
+changes we run. Pin a tested commit or image digest when deploying.
+
+The application fix is isolated in [0e1e0d9](https://github.com/christso/folio/commit/0e1e0d9a6a6384e9d04249fc3c49aa714dd6598b).
+The README notes are a separate commit, so the fix can be reviewed or
+cherry-picked without fork-specific documentation.
+
+### What differs
+
+| Change | Files | Upstream status |
+|---|---|---|
+| Keep unresolved Git conflicts blocked across retries and restarts, including deletions and binary replacements | `server/gitConflictState.ts`, small changes in `server/git.ts` and `server/gitSync.ts`, regression coverage in `server/gitMerge.test.ts` and `server/gitNative.test.ts` | Local fix; not submitted upstream yet |
+| Describe this fork and its maintenance | This section and the notice at the top of the README | Fork only |
+
+The fix records unresolved paths inside each clone's Git directory, in
+`folio-conflicts.json`. That record stays out of wiki commits. It prevents a
+later manual Sync, background retry or graceful restart from publishing a
+merge merely because its files contain no text conflict markers. The
+existing conflict list also shows affected pages and attachments.
+
+To resolve a conflict, make a checked change to the affected file and Sync,
+including deleting it again if deletion is the intended result. Changing an
+unrelated page does not resolve it. For text conflicts, remove the markers
+and keep the intended content as usual. Alternatively, use **Take the version
+from Git**: it backs up the local state before restoring the remote version.
+
+Saving identical bytes does not acknowledge a deletion or binary conflict.
+Keeping that exact version without a content change has no separate
+acceptance button in this fix. If recording the conflict was interrupted,
+or its local record is damaged, use **Take the version from Git** to recover.
+Back up each clone's full Git directory along with the rest of Folio's data.
+The fix protects newly recorded conflicts; it does not undo merges already
+published by an older image or reconstruct records that image never saved.
+
+### Updating from upstream
+
+Keep the application fix and fork documentation in separate commits. Submit
+only the fix and its tests upstream. Keep hostnames, credentials, wiki
+content and deployment policy outside this public repository.
+
+Add an `upstream` remote once, then merge updates without rewriting published
+history:
+
+```bash
+git remote add upstream https://github.com/evergreen-it-dev/folio.git
+git fetch upstream
+git switch main
+git merge --ff-only upstream/main
+git switch deployment
+git merge main
+```
+
+Before publishing an update, inspect `git log --oneline main..deployment`
+and `git diff main...deployment`. Update the base above and the patch table,
+resolve any conflicts, and repeat the focused tests, type check, build and
+running-container checks. If upstream includes an equivalent fix, verify it
+against these cases before removing our implementation; retain useful tests.
+
+### Building the deployment image
+
+Build from `deployment` at the exact commit you intend to run. This uses the
+upstream Dockerfile and includes the source fix; the upstream published image
+does not contain our changes.
+
+```bash
+git switch deployment
+revision=$(git rev-parse HEAD)
+docker build --build-arg FOLIO_RELEASE="$revision" \
+  -t "folio-fork:sha-$revision" .
+```
+
+Use that image in your deployment configuration, or build and start the
+bundled stack with `docker compose up -d --build`. Keep the preceding image
+and a verified data/database backup for recovery. Reverting to an upstream
+image also removes this conflict protection.
+
+Validation commands (the integration tests need PostgreSQL and Redis):
+
+```bash
+npm ci
+npm run typecheck
+npx vitest run server/gitMerge.test.ts server/gitNative.test.ts \
+  server/connectGit.test.ts server/replaceFilePage.test.ts
+npm run build
+```
+
+The running-container checks cover deletion versus editing in both
+directions, independent PDF replacements, repeated and automatic Sync,
+restart while conflicted, explicit recovery, and an open browser receiving a
+clean merge. These use disposable repositories and synthetic content.
