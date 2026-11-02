@@ -6,6 +6,10 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
 
 ### Fixed
 
+- Keep deletion and binary Git conflicts blocked across Sync retries and
+  restarts until their affected files are resolved or the space is explicitly
+  restored from Git. List those paths alongside text conflicts.
+
 - **Single sign-on returns to the page you opened.** Signing in through an
   OpenID Connect or SAML provider (Google included) used to land on `/` and then
   on the last space, so a shared link had to be opened again. The login screen

@@ -127,6 +127,17 @@ export async function performSync(space: string, requestedBy?: GitIdentity): Pro
       const roomBases = await collab.settleRoomsForSync(space);
       await git.commitAll(dir, 'folio:update', actor);
 
+      // A completed merge can still need resolution (deletions and binaries
+      // have no text markers). Check before another merge can change its files.
+      if ((await git.unresolvedConflictPaths(dir)).length > 0) {
+        const lastError = 'unresolved Git conflicts remain; edit the affected files or take the version from Git';
+        await setSpaceStatus(space, { status: 'conflict', lastSyncAt: true, lastError }, actor);
+        const ab = await git.aheadBehind(dir, branch);
+        return { status: 'conflict', ahead: ab.ahead, behind: ab.behind, lastError };
+      }
+
+      await git.clearResolvedConflictState(dir);
+
       const remote = await git.hasRemote(dir);
       if (remote) {
         const askpass = (await hasSpaceToken(space)) ? await ensureAskpassScript() : undefined;
@@ -134,12 +145,17 @@ export async function performSync(space: string, requestedBy?: GitIdentity): Pro
         const preMerge = await git.headSha(dir);
         const { conflict } = await git.mergeFetchedRemote(dir, branch, askpass, space);
         if (conflict) {
-          await git.commitConflictState(dir);
+          await git.commitConflictState(dir, true);
           await storageMod.scanSpace(space);
           await reconcileMergedRooms(space, dir, preMerge, roomBases, askpass);
-          await setSpaceStatus(space, { status: 'conflict', lastSyncAt: true, lastError: 'merge produced conflict markers' }, actor);
+          // Include generated IDs and room reconciliation in the baseline;
+          // those automatic writes must not count as a user's resolution.
+          await collab.settleRoomsForSync(space);
+          await git.commitAll(dir, 'folio: snapshot conflicted files', actor);
+          await git.completeConflictSnapshot(dir);
+          await setSpaceStatus(space, { status: 'conflict', lastSyncAt: true, lastError: 'merge has unresolved Git conflicts' }, actor);
           const ab = await git.aheadBehind(dir, branch);
-          return { status: 'conflict', ahead: ab.ahead, behind: ab.behind, lastError: 'merge produced conflict markers' };
+          return { status: 'conflict', ahead: ab.ahead, behind: ab.behind, lastError: 'merge has unresolved Git conflicts' };
         }
         await storageMod.scanSpace(space);
         await reconcileMergedRooms(space, dir, preMerge, roomBases, askpass);

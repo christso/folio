@@ -1379,3 +1379,115 @@ describe('.folio metadata file (round 22)', () => {
     await deleteTestSpace(space.slug);
   });
 });
+
+describe('markerless conflicts keep their publication hold', () => {
+  let teardownSchema: () => Promise<void>;
+  beforeAll(async () => { teardownSchema = await setUpTestSchema(); });
+  afterAll(async () => { await teardownSchema(); });
+
+  it.each(['local deletion', 'remote deletion', 'binary replacement'])(
+    '%s cannot be published by repeated Sync or an unrelated edit',
+    async (scenario) => {
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'folio-retained-conflict-'));
+      const remote = path.join(root, 'remote.git');
+      const seed = path.join(root, 'seed');
+      const { execFile } = await import('node:child_process');
+      const { promisify } = await import('node:util');
+      const run = promisify(execFile);
+      const file = scenario === 'binary replacement' ? 'attachment.pdf' : 'page.md';
+      const bytes = (value: string): Buffer => Buffer.from(scenario === 'binary replacement' ? `%PDF-1.4\n\0${value}\n` : `# Page\n\n${value}\n`);
+      let slug: string | undefined;
+      try {
+        await run('git', ['init', '--bare', '-b', 'main', remote]);
+        await fs.mkdir(seed);
+        await git.initWithCommit(seed, 'initialize');
+        await fs.writeFile(path.join(seed, 'index.md'), '# Test wiki\n');
+        await fs.writeFile(path.join(seed, file), bytes('base'));
+        await git.commitAll(seed, 'base', { name: 'Tester', email: 'tester@example.test' });
+        await git.addRemote(seed, remote);
+        await git.push(seed, 'main');
+        const space = await storage.createSpaceFromRepo({ name: `Retained ${scenario} ${Date.now()}`, repoUrl: remote, branch: 'main', rootPath: '', createdBy: null, lightFootprint: true });
+        slug = space.slug;
+        const dir = storage.getRepoDir(slug);
+        await git.fetch(seed);
+        await git.mergeFetchedRemote(seed, 'main');
+        if (scenario === 'remote deletion') await fs.rm(path.join(seed, file));
+        else await fs.writeFile(path.join(seed, file), bytes('remote'));
+        await git.commitAll(seed, 'remote change', { name: 'Other', email: 'other@example.test' });
+        await git.push(seed, 'main');
+        const remoteBefore = (await run('git', ['rev-parse', 'main'], { cwd: remote })).stdout;
+        if (scenario === 'local deletion') await fs.rm(path.join(dir, file));
+        else await fs.writeFile(path.join(dir, file), bytes('local'));
+
+        expect((await gitSync.performSync(slug)).status).toBe('conflict');
+        expect((await gitSync.getSpaceConflicts(slug)).map((c) => c.path)).toEqual([file]);
+        expect((await gitSync.performSync(slug)).status).toBe('conflict');
+        await fs.writeFile(path.join(dir, 'unrelated.md'), '# Unrelated\n');
+        expect((await gitSync.performSync(slug)).status).toBe('conflict');
+        expect((await run('git', ['rev-parse', 'main'], { cwd: remote })).stdout).toBe(remoteBefore);
+
+        await fs.writeFile(path.join(dir, file), bytes('checked resolution'));
+        expect((await gitSync.performSync(slug)).status).toBe('clean');
+        expect(await gitSync.getSpaceConflicts(slug)).toEqual([]);
+        const published = await run('git', ['show', `main:${file}`], { cwd: remote, encoding: 'buffer' });
+        expect(published.stdout).toEqual(bytes('checked resolution'));
+      } finally {
+        if (slug) await deleteTestSpace(slug);
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    },
+    30_000,
+  );
+});
+
+describe('conflict resolution does not confuse generated metadata or quoted paths', () => {
+  let teardownSchema: () => Promise<void>;
+  beforeAll(async () => { teardownSchema = await setUpTestSchema(); });
+  afterAll(async () => { await teardownSchema(); });
+
+  it.each(['automatic id', 'quoted path'])(
+    '%s cannot release an unresolved conflict',
+    async (scenario) => {
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'folio-conflict-boundary-'));
+      const remote = path.join(root, 'remote.git');
+      const seed = path.join(root, 'seed');
+      const { execFile } = await import('node:child_process');
+      const { promisify } = await import('node:util');
+      const run = promisify(execFile);
+      const file = scenario === 'quoted path' ? 'draft "café".md' : 'page.md';
+      let slug: string | undefined;
+      try {
+        await run('git', ['init', '--bare', '-b', 'main', remote]);
+        await fs.mkdir(seed);
+        await git.initWithCommit(seed, 'initialize');
+        await fs.writeFile(path.join(seed, 'index.md'), '# Wiki\n');
+        await fs.writeFile(path.join(seed, file), '# Page\n\nBase line.\n');
+        await git.commitAll(seed, 'base', { name: 'Tester', email: 'tester@example.test' });
+        await git.addRemote(seed, remote);
+        await git.push(seed, 'main');
+        const space = await storage.createSpaceFromRepo({ name: `Conflict boundary ${scenario} ${Date.now()}`, repoUrl: remote, branch: 'main', rootPath: '', createdBy: null, lightFootprint: scenario !== 'automatic id' });
+        slug = space.slug;
+        const dir = storage.getRepoDir(slug);
+        await git.fetch(seed);
+        await git.mergeFetchedRemote(seed, 'main');
+        await fs.writeFile(path.join(seed, file), '# Page\n\nRemote changed the line and omitted its id.\n');
+        await git.commitAll(seed, 'remote change', { name: 'Other', email: 'other@example.test' });
+        await git.push(seed, 'main');
+        const before = (await run('git', ['rev-parse', 'main'], { cwd: remote })).stdout;
+        if (scenario === 'automatic id') await fs.rm(path.join(dir, file));
+        else await fs.writeFile(path.join(dir, file), '# Page\n\nLocal changed the line.\n');
+        expect((await gitSync.performSync(slug)).status).toBe('conflict');
+        if (scenario === 'quoted path') {
+          await fs.appendFile(path.join(dir, file), '\nPartial edit; markers are still unresolved.\n');
+        }
+        expect((await gitSync.performSync(slug)).status).toBe('conflict');
+        expect((await gitSync.getSpaceConflicts(slug)).map((c) => c.path)).toEqual([file]);
+        expect((await run('git', ['rev-parse', 'main'], { cwd: remote })).stdout).toBe(before);
+      } finally {
+        if (slug) await deleteTestSpace(slug);
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    },
+    30_000,
+  );
+});

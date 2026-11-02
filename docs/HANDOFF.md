@@ -310,6 +310,13 @@ Plain TypeScript with no DOM lives in `shared/` so both sides import it.
 
 ### Git synchronization
 
+The deployment fork retains unresolved paths in each clone's Git directory.
+Deletion and binary conflicts remain blocked across retries and restarts. A
+committed change to an affected file resolves it; unrelated edits do not.
+The existing take-from-Git recovery clears the record after a successful
+reset. The README's fork maintenance section records the upstream base and
+local patch inventory.
+
 Edits reach the file immediately. The commit is made after about 90 seconds of
 quiet in the space, with the last editor as its author. Spaces with a remote
 fetch every three minutes and before each push; divergence is merged, and a
