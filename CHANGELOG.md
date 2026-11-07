@@ -6,6 +6,13 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
 
 ### Fixed
 
+- Guard external document edits with the exact body revision returned by REST
+  or MCP reads. Stale replacements and invalid exact ranges fail without
+  overwriting newer edits; accepted changes use the existing Yjs room and
+  confirm file/snapshot persistence separately from Git publication. Legacy
+  unguarded bot body updates now require a revision; cookie PUT remains legacy.
+  Snapshot acquisition fails closed and overlapping persistence is serialized.
+
 - Keep deletion and binary Git conflicts blocked across Sync retries and
   restarts until their affected files are resolved or the space is explicitly
   restored from Git. List those paths alongside text conflicts.

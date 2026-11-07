@@ -968,6 +968,7 @@ cherry-picked without fork-specific documentation.
 
 | Change | Files | Upstream status |
 |---|---|---|
+| Guard shared document editing for external agents with exact body revisions and ranges, restored Yjs state and explicit persistence results | `server/documentEdits.ts`, `server/collab.ts`, REST/MCP contracts and tests; [integration guide](docs/AGENT-EDITING.md) | Local increment; owner review and caller migration pending |
 | Keep unresolved Git conflicts blocked across retries and restarts, including deletions and binary replacements | `server/gitConflictState.ts`, small changes in `server/git.ts` and `server/gitSync.ts`, regression coverage in `server/gitMerge.test.ts` and `server/gitNative.test.ts` | Local fix; not submitted upstream yet |
 | Describe this fork and its maintenance | This section and the notice at the top of the README | Fork only |
 

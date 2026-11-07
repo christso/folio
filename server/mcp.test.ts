@@ -583,7 +583,7 @@ describe('server/mcp.ts — search and fetch (ChatGPT deep research format; real
     expect(r.isError).toBeFalsy();
     const body = parsed(r);
     expect(r.structuredContent).toEqual(body);
-    expect(Object.keys(body).sort()).toEqual(['id', 'metadata', 'text', 'title', 'url']);
+    expect(Object.keys(body).sort()).toEqual(['id', 'metadata', 'revision', 'text', 'title', 'url']);
     expect(body).toMatchObject({ id: openDocId, title: 'Open handbook', url: `https://folio.example.com/s/${ownSpace}/p/${openDocId}` });
     expect(body.text).toContain(`The ${marker} lives here.`);
     expect(body.metadata).toMatchObject({ space: ownSpace, kind: 'doc' });
@@ -675,7 +675,8 @@ describe('server/mcp.ts — search and fetch (ChatGPT deep research format; real
       await client.listTools(); // the client validates every later result against the cached outputSchema
       const doc = await run('create_page', { space: ownSpace, parentPath: '', title: 'Structured doc', markdown: '# Structured doc\n\nBody.\n' });
       expect(doc).toMatchObject({ kind: 'doc', title: 'Structured doc' });
-      expect(await run('update_page', { id: doc.id, markdown: '# Structured doc\n\nChanged.\n' })).toMatchObject({ id: doc.id });
+      const readDoc = await run('read_page', { id: doc.id });
+      expect(await run('update_page', { id: doc.id, expectedRevision: readDoc.revision, markdown: '# Structured doc\n\nChanged.\n' })).toMatchObject({ id: doc.id });
       const board = await run('create_board', { space: ownSpace, parentPath: '', title: 'Structured board', sketch: { nodes: [{ id: 'a', type: 'rectangle', label: 'A', x: 0, y: 0 }, { id: 'b', type: 'rectangle', label: 'B', x: 300, y: 40 }], edges: [{ from: 'a', to: 'b' }] } });
       expect(board).toMatchObject({ kind: 'board' });
       expect(await run('update_board', { id: board.id, sketch: { nodes: [{ id: 'a', type: 'rectangle', label: 'A', x: 0, y: 0 }], edges: [] } })).toMatchObject({ id: board.id });

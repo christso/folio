@@ -52,6 +52,8 @@ Every page has:
   the frontmatter (`order`, `icon`, `cover`); the server manages them itself,
   the agent does not write them by hand.
 
+Document reads return the exact Markdown body and `revision`. To edit, pass that revision as `expectedRevision` to `update_page`, with a replacement body or guarded ranges. Reconcile a stale result after rereading. Success confirms file/snapshot persistence; Git publication and indexing are separate.
+
 ## Access rights
 
 - The base role is set by the space: `viewer` (reading), `editor` (writing),

@@ -214,6 +214,13 @@ export async function buildAssistantTools(user: User, runMode: AssistantRunMode,
           const content = Array.isArray(result.content) ? (result.content as Array<{ type: string; text?: string }>) : [];
           const text = content.find((c) => c.type === 'text')?.text ?? '';
           const { truncated, body } = truncate(text);
+          const document = result.structuredContent as Record<string, unknown> | undefined;
+          if (truncated && tool.name === 'read_page' && document?.kind === 'doc' && typeof document.markdown === 'string') {
+            // A full-body revision paired with an excerpt could authorize a
+            // replacement that silently drops the unseen remainder.
+            const notice = 'This document is too large for a complete assistant read. No edit revision is provided. Use external MCP or REST for a complete read before editing. Read-only preview:\n';
+            return { content: [{ type: 'text' as const, text: notice + document.markdown.slice(0, MAX_TOOL_RESPONSE_CHARS - notice.length) }], isError: true };
+          }
           const finalText = truncated ? body : text;
           if (result.isError) return { content: [{ type: 'text' as const, text: finalText }], isError: true };
           return finalText;

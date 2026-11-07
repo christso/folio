@@ -908,6 +908,14 @@ work continues; come back and read on from where it stopped.
 
 ## 12. Integration for external tools (MCP)
 
+Document reads return a body `revision`. Bots pass it as `expectedRevision` to
+replace a body or apply exact guarded ranges through the same Yjs room as the
+browser. Stale writes fail; unrelated characters and frontmatter are preserved.
+Success confirms file/snapshot persistence separately from Git publication.
+See [Shared agent editing](AGENT-EDITING.md) for the contract, compatibility and
+migration procedure. This is a single-page API; multi-file publishers and their
+receipts remain separate.
+
 The `/mcp` endpoint with a personal access token (`folio_pat_…`), scopes
 `read` and `write`. 45 tools: listing spaces and trees, reading a page,
 search (plus `search` and `fetch` for ChatGPT deep research), creating and updating pages, resolving a Folio link, backlinks

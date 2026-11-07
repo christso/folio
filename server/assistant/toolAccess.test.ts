@@ -442,6 +442,20 @@ describe('assistant tools only return what the user may read (real PG, in-proces
     expect((await call(t, READ_SKILL_TOOL, {})).isError).toBe(true);
   });
 
+  it('withholds an edit revision when a document exceeds the assistant response budget', async () => {
+    const page = await storage.createPage({ space: slugA, parentPath: '', title: 'Long document', kind: 'doc' }, { docBody: '# Long document\n\n' + 'x'.repeat(130_000) });
+    const handle = await tools(alice, 'agent');
+    const result = await call(handle, 'read_page', { id: page.id });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('complete assistant read');
+    expect(result.text).not.toContain('body-v1:');
+    expect(result.text.length).toBeLessThanOrEqual(120_000);
+    const write = await call(handle, 'update_page', { id: page.id, markdown: 'incomplete replacement' });
+    expect(write.isError).toBe(true);
+    expect(write.text).toContain('revision_required');
+    expect((await storage.readFreshDocBody(page.id)).length).toBeGreaterThan(130_000);
+  });
+
   // -------------------------------------------------------------------------
   // No OS sandbox: the Cursor agent must be offered the MCP tool family only
   // -------------------------------------------------------------------------

@@ -136,6 +136,15 @@ what is not there.
 
 ## Agents
 
+Document body updates over MCP and PAT REST require the exact read revision.
+A stale revision is rejected even for a change elsewhere in the body; ranges
+are not automatically rebased. This protects server-received text, while later
+offline/browser operations follow Yjs merge semantics. Legacy cookie body PUT
+and internal replacements remain unguarded. Document edits are capped at 1 MiB
+and 100 ranges. They do not provide atomic page/index/log publication, durable
+request-id receipts or a prepublication approval queue. See
+[Shared agent editing](AGENT-EDITING.md).
+
 12. **Through MCP you cannot**: create an `index.md` for a folder, manage
     access rights, rename or delete a space. Those actions go through the
     interface only.

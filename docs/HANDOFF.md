@@ -191,6 +191,33 @@ person may only view (page access) opens read-only instead of in an editor
 whose typing would be dropped. A write made by an agent goes through the live
 document when the room is open, so it appears in every open tab at once.
 
+**Guarded agent body edits.** Document reads (`pageDoc.ts`, MCP `read_page`
+and `fetch`) now acquire the restored room and capture body plus revision
+together, including cold reads. MCP `update_page` and PAT document PUT require
+`expectedRevision` and a body replacement or exact ranges. `documentEdits.ts`
+checks the revision and every range synchronously before the Yjs transaction;
+replacements keep shared prefix/suffix characters. Foreign frontmatter stays
+outside the CRDT. Successful results distinguish confirmed file/snapshot
+persistence from pending Git publication. Conflict and no-op calls do not
+claim attribution. Cookie body PUT and internal replacements remain legacy
+and unguarded. See [Shared agent editing](AGENT-EDITING.md).
+
+API-only rooms are reclaimed after inactivity; an API user holds a room until
+its operation finishes. Seeding waits for a closing room's persistence, and
+writer flushes are serialized so older writes cannot finish after newer ones.
+Snapshot lookup/decode failures stop acquisition, remove only the failed
+unseeded room and preserve the stored snapshot. Never treat failure as absence
+and reseed character identities from the file.
+
+This local fork increment does not migrate bots or replace the existing
+multi-file publisher. Page/index/log writes through it are not atomic. Keep
+structured note request journals, selected-file publication, receipts,
+source exclusions, private scopes and approval policy on their current path.
+Published readers/indexes still consume Git, not the live body.
+
+The local checks and exact changed paths are recorded in
+[Guarded editing verification](verification/guarded-agent-editing.md).
+
 **Typed text must reach the server, and the browser must know it did.**
 
 - *Editor to document.* `web/src/editor/collab-sync.ts` replaces

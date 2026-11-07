@@ -49,6 +49,8 @@ import { decodeScenePayload, extractScenePayload, renderSceneSvg } from './confl
 import { orderBoardElements, placeBoundTexts, withBoardIndexes } from './boardOrder.js';
 import type { ExcalidrawElement, ExcalidrawScene } from './confluenceWhiteboard.js';
 import { trackConnection } from './liveConnections.js';
+import { bodyRevision, DocumentEditError, planBodyEdit } from './documentEdits.js';
+import type { DocumentBodyEditResult } from '../shared/contracts.js';
 
 interface PersistenceHooks {
   bindState: (docName: string, doc: Y.Doc) => Promise<void> | void;
@@ -150,6 +152,7 @@ function yEngineFor(ydoc: Y.Doc): typeof Y {
 const WRITE_DEBOUNCE_MS = 800;
 
 interface DebouncedWriter {
+  isIdle(): boolean;
   schedule(): void;
   flush(): Promise<void>;
   /** Cancels any pending timer WITHOUT running `fn` — unlike flush(), the scheduled write never happens. Used by reconcileLiveRoomsAfterReset below: a reset-to-remote just rewrote the file, and flushing a stale in-memory write over it would silently reintroduce whatever the reset just threw away. */
@@ -163,7 +166,10 @@ export function createDebouncedWriter(fn: () => void | Promise<void>, ms: number
   let timer: ReturnType<typeof setTimeout> | undefined;
   let inFlight: Promise<void> | undefined;
   const run = (): Promise<void> => {
-    const p = Promise.resolve(fn()).finally(() => {
+    // A flush can overlap the timer or a closing socket. Capture/write each
+    // new state only after the previous file AND snapshot write completes.
+    const operation = inFlight ? inFlight.catch(() => {}).then(fn) : Promise.resolve(fn());
+    const p = operation.finally(() => {
       if (inFlight === p) inFlight = undefined;
     });
     inFlight = p;
@@ -177,6 +183,7 @@ export function createDebouncedWriter(fn: () => void | Promise<void>, ms: number
     await run();
   };
   return {
+    isIdle: () => !timer && !inFlight,
     schedule() {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
@@ -231,6 +238,7 @@ export function isDocSeeded(docName: string): boolean {
  * content with different, non-merging CRDT op identity).
  */
 const seedingPromises = new Map<string, Promise<void>>();
+const closingRooms = new Map<string, Promise<void>>();
 
 /**
  * Round 8 P0 FIX (root cause). Confirmed via live repro: a share-link guest
@@ -272,6 +280,11 @@ const seedingPromises = new Map<string, Promise<void>>();
  * seeded. Applies identically to cookie and share-token connections.
  */
 async function ensureDocSeeded(docName: string): Promise<void> {
+  const closing = closingRooms.get(docName);
+  if (closing) {
+    await closing;
+    return ensureDocSeeded(docName);
+  }
   if (docs.has(docName)) {
     const inFlight = seedingPromises.get(docName);
     if (inFlight) await inFlight;
@@ -282,6 +295,11 @@ async function ensureDocSeeded(docName: string): Promise<void> {
   const seed = bindState(docName, doc)
     .then(() => {
       seededDocs.set(docName, true);
+    })
+    .catch((err) => {
+      if (docs.get(docName) === doc) docs.delete(docName);
+      doc.destroy();
+      throw err;
     })
     .finally(() => {
       seedingPromises.delete(docName);
@@ -392,9 +410,11 @@ export async function persistDoc(docName: string, ydoc: Y.Doc): Promise<boolean>
       });
       return false;
     }
+    // Once the file changed it needs a commit even if snapshot persistence
+    // fails. A retry sees identical file bytes and cannot rediscover this write.
+    if (written) gitSync.noteActivity(current.space);
     await storeSnapshot(docName, ydoc, storage.docFileBody(newBody)); // same cadence as the file write
     if (!written) return true;
-    gitSync.noteActivity(current.space); // starts/resets the ~90s quiet-period auto-commit
     // Title edited in the H1 (the usual way a new page gets its name): follow
     // with the slug while it is still the auto-derived one — see maybeAutoRenameSlug.
     const titleAfter = storage.extractH1(newBody);
@@ -2253,11 +2273,9 @@ export async function bindState(docName: string, ydoc: Y.Doc): Promise<void> {
     // Round 29 board branch — see the "BOARD COLLAB" section below.
     await bindBoardState(docName, ydoc, entry);
   } else if (entry && entry.kind === 'doc') {
-    const row = await loadSnapshotRow(docName).catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error(`[collab] failed to load snapshot for ${docName}:`, err);
-      return undefined;
-    });
+    // Failure is not snapshot absence. Reseeding after a failed lookup would
+    // replace established CRDT identities and duplicate offline clients' text.
+    const row = await loadSnapshotRow(docName);
     const snapshot = row?.snapshot;
 
     if (snapshot) {
@@ -2310,15 +2328,12 @@ export async function bindState(docName: string, ydoc: Y.Doc): Promise<void> {
         });
       }
     } else if (ytext.length === 0) {
-      const body = normalizeEol(await storage.readFreshDocBody(docName).catch(() => entry.body ?? ''));
+      const body = normalizeEol(await storage.readFreshDocBody(docName));
       // Re-check length: bindState is async, and a concurrent update could have raced ahead of us.
       if (ytext.length === 0 && body) {
         ydoc.transact(() => ytext.insert(0, body));
       }
-      await storeSnapshot(docName, ydoc, ytext.length > 0 ? storage.docFileBody(ytext.toString()) : undefined).catch((err) => {
-        // eslint-disable-next-line no-console
-        console.error(`[collab] failed to store initial snapshot for ${docName}:`, err);
-      });
+      await storeSnapshot(docName, ydoc, ytext.length > 0 ? storage.docFileBody(ytext.toString()) : undefined);
     }
   }
 
@@ -2334,6 +2349,7 @@ export async function bindState(docName: string, ydoc: Y.Doc): Promise<void> {
     if (retryTimer) clearTimeout(retryTimer);
     retryTimer = undefined;
     const ok = await persistDoc(docName, ydoc);
+    persistSucceeded.set(ydoc, ok);
     if (ok) {
       failures = 0;
       return;
@@ -2377,17 +2393,23 @@ const PERSIST_MAX_RETRIES = 8;
  * closure bindState armed above — already covers storing the snapshot too;
  * no separate snapshot-store call is needed here.
  */
-async function writeState(docName: string, _ydoc: Y.Doc): Promise<void> {
-  const writer = writers.get(docName);
-  if (writer) {
-    await writer.flush();
-    writers.delete(docName);
-  }
-  // The doc is about to be evicted from y-websocket's `docs` map (closeConn, right
-  // after this resolves) — a future reopen is a genuinely fresh WSSharedDoc that
-  // must go through ensureDocSeeded again, so this doc's "seeded" flag shouldn't
-  // outlive it either.
-  seededDocs.delete(docName);
+function writeState(docName: string, _ydoc: Y.Doc): Promise<void> {
+  // y-websocket removes the map entry immediately, before this promise resolves.
+  // A reconnect must wait for the old writer before it restores the snapshot.
+  const closing = (async () => {
+    if (apiRoomUsers.get(_ydoc)) await new Promise<void>((resolve) => apiRoomWaiters.set(_ydoc, resolve));
+    const writer = writers.get(docName);
+    if (writer) {
+      await writer.flush();
+      if (writers.get(docName) === writer) writers.delete(docName);
+    }
+    seededDocs.delete(docName);
+  })();
+  closingRooms.set(docName, closing);
+  void closing.finally(() => {
+    if (closingRooms.get(docName) === closing) closingRooms.delete(docName);
+  }).catch(() => {});
+  return closing;
 }
 
 /** Registers the persistence hooks with y-websocket. Call once at server boot. */
@@ -2603,6 +2625,94 @@ export function getLiveText(id: string): string | undefined {
   return docs.get(id)?.getText('content').toString();
 }
 
+const persistSucceeded = new WeakMap<Y.Doc, boolean>();
+const apiRoomUsers = new WeakMap<Y.Doc, number>();
+const apiRoomWaiters = new WeakMap<Y.Doc, () => void>();
+const apiRoomCleanup = new WeakMap<Y.Doc, ReturnType<typeof setTimeout>>();
+
+/** API-only rooms retain their snapshot but do not accumulate in memory. */
+function scheduleApiRoomCleanup(id: string, doc: Y.Doc): void {
+  const pending = apiRoomCleanup.get(doc);
+  if (pending) clearTimeout(pending);
+  const timer = setTimeout(() => {
+    apiRoomCleanup.delete(doc);
+    if (docs.get(id) !== doc || (doc as Y.Doc & { conns?: Map<unknown, unknown> }).conns?.size) return;
+    const writer = writers.get(id);
+    if (apiRoomUsers.get(doc) || !writer?.isIdle()) {
+      scheduleApiRoomCleanup(id, doc);
+      return;
+    }
+    if (persistSucceeded.get(doc) === false) {
+      // The normal burst of retries may have ended while storage was down.
+      // Retain the room, but let recovery make it durable and reclaimable.
+      void writer.flush().finally(() => scheduleApiRoomCleanup(id, doc)).catch((err) => console.error('[collab] API room persistence retry failed:', err));
+      return;
+    }
+    // No socket or API user can enter between this check and eviction.
+    const closing = writeState(id, doc);
+    docs.delete(id);
+    void closing.then(() => doc.destroy()).catch((err) => console.error('[collab] API room close failed:', err));
+  }, 30_000);
+  timer.unref();
+  apiRoomCleanup.set(doc, timer);
+}
+
+async function withDocumentRoom<T>(id: string, fn: (doc: Y.Doc, entry: storage.PageIndexEntry) => T | Promise<T>): Promise<T> {
+  const entry = await storage.requireEntry(id);
+  if (entry.kind !== 'doc') throw badRequest('page is not a document');
+  for (;;) {
+    await ensureDocSeeded(id);
+    const doc = docs.get(id);
+    if (!doc) continue; // the last socket closed while acquisition awaited
+    apiRoomUsers.set(doc, (apiRoomUsers.get(doc) ?? 0) + 1);
+    try {
+      return await fn(doc, entry);
+    } finally {
+      apiRoomUsers.set(doc, (apiRoomUsers.get(doc) ?? 1) - 1);
+      if (!apiRoomUsers.get(doc)) {
+        apiRoomWaiters.get(doc)?.();
+        apiRoomWaiters.delete(doc);
+      }
+      scheduleApiRoomCleanup(id, doc);
+    }
+  }
+}
+
+/** Body and revision are captured together from the same restored document. */
+export async function readDocumentBody(id: string): Promise<{ markdown: string; revision: string }> {
+  return withDocumentRoom(id, (doc) => {
+    const markdown = doc.getText('content').toString();
+    return { markdown, revision: bodyRevision(id, markdown) };
+  });
+}
+
+/** Authorization is the caller's responsibility. No await separates guards and mutation. */
+export async function editDocumentBody(id: string, input: unknown, author: GitIdentity): Promise<DocumentBodyEditResult> {
+  return withDocumentRoom(id, async (doc, entry) => {
+    const writer = writers.get(id);
+    const ytext = doc.getText('content');
+    const before = ytext.toString();
+    const plan = planBodyEdit(id, before, input);
+    const changed = plan.changes.length > 0;
+    if (changed) {
+      gitSync.recordEditor(entry.space, author);
+      doc.transact(() => {
+        for (const edit of [...plan.changes].reverse()) {
+          ytext.delete(edit.from, edit.to - edit.from);
+          if (edit.text) ytext.insert(edit.from, edit.text);
+        }
+      }, 'guarded-api-edit');
+      if (typeof input === 'object' && input !== null && 'markdown' in input && input.markdown !== undefined) await backupRoomText(id, 'body replaced through the guarded API', before);
+    }
+    // flushDoc alone cannot prove success: its normal retry path absorbs errors.
+    await writer?.flush();
+    if (!writer || persistSucceeded.get(doc) !== true) {
+      throw new DocumentEditError(503, 'body_persistence_failed', 'The edit may already be live, but file/snapshot persistence was not confirmed. Read back before retrying.', { acceptedRevision: plan.revision });
+    }
+    return { ...storage.toPageMeta(await storage.requireEntry(id)), revision: plan.revision, changed, persistence: 'file', publication: 'pending' };
+  });
+}
+
 /**
  * Routes a PUT's markdown through the live Y.Doc (full-text replace inside a
  * transaction) instead of writing the file directly. The doc's own 'update'
@@ -2611,48 +2721,47 @@ export function getLiveText(id: string): string | undefined {
  * caller's response (and any immediate GET/search) reflects it right away.
  */
 export async function applyMarkdownUpdate(id: string, rawMarkdown: string, overrideIcon?: string | null, overrideCover?: string | null): Promise<void> {
-  const markdown = normalizeEol(rawMarkdown);
-  const doc = docs.get(id);
-  if (!doc) return;
-  const entry = await storage.getEntry(id);
+  if (!docs.has(id)) return;
+  return withDocumentRoom(id, async (doc, entry) => {
+    const markdown = normalizeEol(rawMarkdown);
 
-  // icon/cover never ride the Yjs body (frontmatter isn't part of the CRDT), so an
-  // icon/cover-only PUT (body text unchanged) would otherwise never trigger the
-  // debounced write-back at all — persist it immediately instead of hoping a later
-  // body edit happens to carry it to disk too. resolveIconCoverOverride keeps the
-  // undefined=preserve / null=clear / string=set distinction correct — a naive
-  // `overrideIcon ?? entry.icon` would treat null the SAME as undefined (both are
-  // "nullish" to ??), silently turning an explicit clear into a no-op.
-  if (entry && (overrideIcon !== undefined || overrideCover !== undefined)) {
-    const icon = storage.resolveIconCoverOverride(overrideIcon, entry.icon);
-    const cover = storage.resolveIconCoverOverride(overrideCover, entry.cover);
-    await storage.setDocIconCover(entry, icon, cover, markdown);
-  }
+    // icon/cover never ride the Yjs body (frontmatter isn't part of the CRDT), so an
+    // icon/cover-only PUT (body text unchanged) would otherwise never trigger the
+    // debounced write-back at all — persist it immediately instead of hoping a later
+    // body edit happens to carry it to disk too. resolveIconCoverOverride keeps the
+    // undefined=preserve / null=clear / string=set distinction correct — a naive
+    // `overrideIcon ?? entry.icon` would treat null the SAME as undefined (both are
+    // "nullish" to ??), silently turning an explicit clear into a no-op.
+    if (overrideIcon !== undefined || overrideCover !== undefined) {
+      const icon = storage.resolveIconCoverOverride(overrideIcon, entry.icon);
+      const cover = storage.resolveIconCoverOverride(overrideCover, entry.cover);
+      await storage.setDocIconCover(entry, icon, cover, markdown);
+    }
 
-  const ytext = doc.getText('content');
-  if (ytext.toString() !== markdown) {
-    // A REST/MCP body write replaces the whole live text — including whatever
-    // someone typed into the room after the caller read the page. Captured
-    // before, stored after: no await between reading the text and replacing it.
-    const before = ytext.toString();
-    doc.transact(() => {
-      ytext.delete(0, ytext.length);
-      ytext.insert(0, markdown);
-    });
-    await backupRoomText(id, 'body replaced through the API', before);
-  }
-  if (entry) await storage.patchEntryContent(entry, markdown);
+    const ytext = doc.getText('content');
+    if (ytext.toString() !== markdown) {
+      // A legacy body write replaces the whole live text — including whatever
+      // someone typed into the room after the caller read the page. Captured
+      // before, stored after: no await between reading the text and replacing it.
+      const before = ytext.toString();
+      doc.transact(() => {
+        ytext.delete(0, ytext.length);
+        ytext.insert(0, markdown);
+      });
+      await backupRoomText(id, 'body replaced through the API', before);
+    }
+    await storage.patchEntryContent(entry, markdown);
+  });
 }
 
 /**
- * The live-doc-aware "set a doc's body" path, shared by the REST PUT route
- * and MCP's update_page tool (round 7: "update_page routes through the same
- * live-doc-aware path as REST PUT") — one function, so the two callers can
- * never silently diverge. Live doc open -> through the Y.Doc (merges
- * correctly with concurrent typing instead of stomping it); otherwise
- * straight to the file.
+ * Legacy replacement for internal writers and cookie REST PUT. It is
+ * unguarded and can replace newer typing. External bots use editDocumentBody
+ * with a revision instead.
  */
 export async function editDocBody(id: string, rawMarkdown: string, overrideIcon?: string | null, overrideCover?: string | null): Promise<PageMeta> {
+  const seeding = seedingPromises.get(id);
+  if (seeding) await seeding;
   // Normalized for the file too: the next room opened on it is seeded from it.
   const markdown = normalizeEol(rawMarkdown);
   if (isDocLive(id)) {
@@ -2664,6 +2773,8 @@ export async function editDocBody(id: string, rawMarkdown: string, overrideIcon?
 
 /** Same idea as applyMarkdownUpdate, for H1-only renames. Returns false if no live doc is open. */
 export async function applyH1Rename(id: string, title: string): Promise<boolean> {
+  const seeding = seedingPromises.get(id);
+  if (seeding) await seeding;
   const doc = docs.get(id);
   const entry = await storage.getEntry(id);
   if (!doc || !entry) return false;
@@ -2688,20 +2799,22 @@ export async function applyH1Rename(id: string, title: string): Promise<boolean>
   }
 
   if (entry.kind !== 'doc') return false;
-  const ytext = doc.getText('content');
-  const updated = storage.replaceFirstH1(ytext.toString(), normalizeEol(title));
-  doc.transact(() => {
-    ytext.delete(0, ytext.length);
-    ytext.insert(0, updated);
+  return withDocumentRoom(id, async (liveDoc, current) => {
+    const ytext = liveDoc.getText('content');
+    const updated = storage.replaceFirstH1(ytext.toString(), normalizeEol(title));
+    liveDoc.transact(() => {
+      ytext.delete(0, ytext.length);
+      ytext.insert(0, updated);
+    });
+    // round 22: renaming the SPACE ROOT's title live is, today, the only existing way a
+    // space's effective display name changes post-creation while it's open for editing —
+    // see storage.noteSpaceNameChange's doc comment for the full "where does 'name' live" story.
+    if (current.isIndex && current.dirPath === '') {
+      await storage.noteSpaceNameChange(current.space, storage.extractH1(updated) ?? title);
+    }
+    await storage.patchEntryContent(current, updated);
+    return true;
   });
-  // round 22: renaming the SPACE ROOT's title live is, today, the only existing way a
-  // space's effective display name changes post-creation while it's open for editing —
-  // see storage.noteSpaceNameChange's doc comment for the full "where does 'name' live" story.
-  if (entry.isIndex && entry.dirPath === '') {
-    await storage.noteSpaceNameChange(entry.space, storage.extractH1(updated) ?? title);
-  }
-  await storage.patchEntryContent(entry, updated);
-  return true;
 }
 
 /**

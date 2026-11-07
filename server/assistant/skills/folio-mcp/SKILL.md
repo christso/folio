@@ -59,7 +59,7 @@ audit of the current user of the session, without a separate token.
 |---|---|
 | `board_ops` | Align/distribute/move/automatically lay out the elements of an EXISTING board by their ids (from `read_page`), keeping labels and arrows — for "make it tidy", "align it" |
 | `create_page` | Create a page (`doc` by default, or `kind: 'table'` with a starting schema of columns) |
-| `update_page` | Replace the markdown body of a document (NOT for `board`/`table`) |
+| `update_page` | Guard a document body replacement or exact ranges with `expectedRevision` from `read_page` (NOT for `board`/`table`) |
 | `create_page_from_template` | Copy a template (`templateId` from `list_templates`, any kind, its subpages along) under `parentPath` of `space`, optional `title`; `{{date}}`, `{{author}}`, `{{title}}` in its documents are filled in. Returns the new page and its `url` |
 | `save_page_as_template` | Copy an existing page (`id`) into `_templates/` so it can be reused; optional `title`, `description`, `includeChildren` (default true). The original stays. Returns the template and its `id` |
 | `create_template` | A new document template in `_templates/` (`space`, `title`, optional `description`, `markdown` with `{{date}}`/`{{author}}`/`{{title}}`). To make a template of an existing page use `save_page_as_template` |
@@ -131,7 +131,7 @@ A template is a page under the space's `_templates/` folder; `list_tree` and
 - Never put anything into `_templates/` with `create_page` — it refuses that
   folder.
 
-## Important pitfalls (from `docs/AGENT-API.md`, checked against the code)
+## Important pitfalls (from `docs/MCP.md`, checked against the code)
 
 - **`create_page` takes ready text only for a document.** An optional
   `markdown` (only for `kind: 'doc'`, the default) is written right after the
@@ -142,6 +142,7 @@ A template is a page under the space's `_templates/` folder; `list_tree` and
   above it; if it does, that heading is kept and becomes the page title (the
   `title` argument then only names the file) — check `title` in the reply.
   To change the text of an existing page, call `update_page`.
+- **Before `update_page`, read the document.** Pass its exact `revision` as `expectedRevision` with either the replacement `markdown` or `edits: [{from,to,expectedText,text}]`. Ranges are nonoverlapping UTF-16 offsets in that original LF body. Use no frontmatter; metadata has its own API. A stale revision or mismatched range fails without mutation: reread and reconcile. Read back after a write or uncertain response; never blindly retry an insertion. Success confirms file/snapshot persistence, while Git publication remains pending.
 - **`update_page` works for documents only.** For a table — only
   `folio_table_*`; a board — `update_board`/`board_ops`; a form —
   `update_form`; a base — `save_base`; an artifact — `publish_artifact`
