@@ -1,0 +1,26 @@
+{
+  "source_base": "9a4b30b9065fa1dc05b8bcec2fe75f7710a430cf",
+  "fixed_source": "e4de9bac7748c30c77129ab367a06291748bd3b3",
+  "content": "Synthetic example note",
+  "steps": "Delete through browser, publish an independent edit, Sync through browser, then Sync again without choosing a resolution",
+  "cases": {
+    "upstream": {
+      "first_status": "conflict",
+      "first_remote_unchanged": true,
+      "retry_status": "clean",
+      "before_remote": "819845d33f6426dd3a80daf61aa729c2584e4dc6",
+      "after_remote": "c8e288605a45d2fbeeaa04489c9902054b228243",
+      "remote_advanced": true,
+      "resolution_chosen": false
+    },
+    "fixed": {
+      "first_status": "conflict",
+      "first_remote_unchanged": true,
+      "retry_status": "conflict",
+      "before_remote": "07b3854ee1718117b5569cab277db124bfdcf6a0",
+      "after_remote": "07b3854ee1718117b5569cab277db124bfdcf6a0",
+      "remote_advanced": false,
+      "resolution_chosen": false
+    }
+  }
+}
