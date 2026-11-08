@@ -13,8 +13,8 @@ execution: code
 
 **Objective:** Authorized bots and browser users can edit the same Folio documents without a bot silently replacing changes received since its read.
 **Means:** Body revisions and guarded replacements or exact ranges through the existing live document (KTD1–KTD3).
-**Authority:** The owner's request and repository invariants govern. Implementation and local verification are authorized; publication, deployment, live caller migration and permission/credential changes are excluded.
-**Execution profile:** One local feature branch based on deployment commit `2d2ae63`, preserving the conflict-recovery patch. The orchestrator implements sequentially and returns behavior and evidence for owner review. Any later release requires owner approval.
+**Authority:** The owner's request and repository invariants govern. Implementation and local verification were initially authorized. The owner subsequently authorized pushing this feature branch and maintaining draft PR #2 against `deployment`, with babysitting disabled, plus merging the current deployment base into this branch without rewriting published history. PR merge, deployment, live caller migration and production permission/credential changes remain excluded.
+**Execution profile:** One feature branch initially based on deployment commit `2d2ae63`, now integrating deployment `971aaf4` by merge and preserving its newer upstream conflict recovery. The orchestrator implements sequentially and returns behavior and evidence for owner review. Any later release requires owner approval.
 
 ---
 
@@ -135,4 +135,12 @@ Run `npm run typecheck`, focused Vitest tests for document editing plus affected
 
 ## Definition of Done
 
-All units have concrete local changes and relevant verification evidence. Guarded bot writes cannot overwrite a newer accepted body, preserve unaffected text and frontmatter, obey existing access, and report completion accurately. Durable documentation and migration guidance are public-safe. Simplification and code review are recorded, material findings resolved, abandoned code removed, and every missing validation prerequisite is named. Return the plan path, branch/worktree, changed paths and exact checks. No deployment, publication or caller migration occurs.
+All units have concrete local changes and relevant verification evidence. Guarded bot writes cannot overwrite a newer accepted body, preserve unaffected text and frontmatter, obey existing access, and report completion accurately. Durable documentation and migration guidance are public-safe. Simplification and code review are recorded, material findings resolved, abandoned code removed, and every missing validation prerequisite is named. Return the plan path, branch/worktree, changed paths and exact checks. The authorized branch and draft PR may be published for review. No PR merge, deployment, content publication or caller migration occurs.
+
+## Owner-directed integration and adversarial verification
+
+The initial implementation was reviewed and verified at `68c9901`. After draft PR creation the owner requested deeper end-user dogfooding and a merge of the advanced deployment base into the same branch. This extends verification rather than restarting the plan. Preserve upstream comments, MDX, writing rules, stable identifiers and its replacement for the earlier fork-only conflict patch.
+
+The comment anchoring path must share guarded editing's room lease; its independent immediate-close implementation can otherwise destroy a room during an awaited API save. Prove the race before fixing it, retain comment anchor identities and arbitrary snapshot roots, and verify MDX source/frontmatter preservation. Rerun typecheck, targeted concurrency/access/comment/MDX/Git-recovery tests, build and the built-container browser pass on the integrated tree.
+
+Use two independently authenticated real browser sessions with synthetic pages: same/different paragraph typing, bot edits during typing, stale reread/reconsider/retry, offline/reconnect/reload, undo/redo, selection/caret stability, dropped responses and a reversible isolated persistence fault. Keep API fixture-client evidence distinct from browser actions and from an actual integrated bot UI. Classify correctness regressions for local fixes; document larger pre-existing UX gaps without expanding the feature into a new save protocol or adapter. Record actual attempts and starvation friction. Publish only sanitized evidence in the existing verification report, excluding runtime/browser identities and tokens. Keep the PR draft pending owner review.

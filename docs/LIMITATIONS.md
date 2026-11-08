@@ -124,6 +124,15 @@ what is not there.
    git or on disk) — the sidecar then stays at the old path until it is moved by
    hand. Space files that are not pages (images and other attachments) have no
    properties.
+9a. **MDX is kept, not run.** A `.mdx` page shows its components as labelled boxes
+    with their Markdown body, not as the site will draw them (no component styles,
+    no switchable tabs, no imported diagrams), and `{expressions}` stay text.
+    `import`/`export` lines and brace comments on their own line are hidden in
+    Reading. A component is recognised by a line starting with a capitalised tag up
+    to its closing tag; inline JSX, text after a closing tag on the same line and an
+    unclosed component stay plain paragraph text, and lower-case HTML is Markdown's
+    own. Search and backlinks see imports and tags as ordinary page text. `.markdown`
+    files are still skipped (the scan logs how many).
 
 ## Git
 
@@ -138,12 +147,16 @@ what is not there.
 
 Document body updates over MCP and PAT REST require the exact read revision.
 A stale revision is rejected even for a change elsewhere in the body; ranges
-are not automatically rebased. This protects server-received text, while later
+are not automatically rebased. Sustained typing can starve a caller that repeatedly
+prepares edits from a changing body; callers need bounded retries and a quiet
+moment, rather than blind revision substitution. This protects server-received text, while later
 offline/browser operations follow Yjs merge semantics. Legacy cookie body PUT
 and internal replacements remain unguarded. Document edits are capped at 1 MiB
 and 100 ranges. They do not provide atomic page/index/log publication, durable
 request-id receipts or a prepublication approval queue. See
-[Shared agent editing](AGENT-EDITING.md).
+[Shared agent editing](AGENT-EDITING.md). Browser connection and acknowledgement
+indicators do not confirm file persistence or remote publication; an API
+persistence failure has no integrated browser/bot conflict UI in this increment.
 
 12. **Through MCP you cannot**: create an `index.md` for a folder, manage
     access rights, rename or delete a space. Those actions go through the

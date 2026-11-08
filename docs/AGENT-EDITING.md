@@ -27,7 +27,7 @@ For a read body `# Example\n\nOld text.\n`, change only `Old`:
 }
 ```
 
-Offsets are zero-based UTF-16 code units, `to` exclusive, in the LF-normalized body, including its exact final newline. Every range refers to the same original body. Request order does not matter. Empty ranges insert text with `expectedText: ""`; empty replacement text deletes it. Multiple occurrences of a phrase are addressed by their explicit ranges. Overlapping ranges, duplicate insertion positions, partial Unicode characters and text mismatches are rejected before any mutation. A stale revision conflicts even if the proposed range was untouched.
+Offsets are zero-based UTF-16 code units, `to` exclusive, in the LF-normalized body, including its exact final newline. Every range refers to the same original body. Request order does not matter. Empty ranges insert text with `expectedText: ""`; empty replacement text deletes it. Multiple occurrences of a phrase are addressed by their explicit ranges. Overlapping ranges, duplicate insertion positions, partial Unicode characters and text mismatches are rejected before any mutation. A stale revision conflicts even if the proposed range was untouched. Under continuous typing, repeated read/prepare/write attempts can keep conflicting; there is no reservation or fairness guarantee. Keep retries bounded, reread and reconsider each proposal, and ask for a quiet moment when needed. Never substitute the new revision into an old edit blindly.
 
 Requests accept exactly one of `markdown` or `edits` (1–100 ranges), without metadata fields. Edit strings together and the resulting body are limited to 1 MiB of UTF-8; individual strings are also bounded. REST's HTTP request-size limit still applies, including JSON overhead. Use LF and complete Unicode characters. Leading YAML frontmatter is refused: use the properties API with its own ETag for metadata. The existing frontmatter remains in the file.
 
@@ -44,9 +44,11 @@ A successful response includes the page metadata plus:
 }
 ```
 
+The existing page metadata `status: "published"` describes its workflow state, not a remote Git publication receipt.
+
 `revision` identifies the accepted body, not a Git commit, an event sequence, or a reservation. Identical body content can have the same revision again. Revision checks cover edits received by the server before the transaction; offline and in-flight browser operations subsequently merge with ordinary Yjs semantics. The server checks and mutates synchronously, retaining characters outside the affected ranges. Replacements retain the shared prefix and suffix; use targeted edits for separated changes to preserve more character identities.
 
-Success confirms a Markdown file write/check and collaborative snapshot persistence. A no-op reports `changed: false` and does not claim authorship or start a new commit. The connected user's existing identity is recorded for accepted changes; commits retain Folio's last-editor-per-space behavior and may include other pending edits. There is no per-request Git commit or new audit-receipt store.
+Success confirms a Markdown or MDX file write/check and collaborative snapshot persistence. MDX imports, components and expressions outside the edited range are opaque body text and stay intact. A no-op reports `changed: false` and does not claim authorship or start a new commit. The connected user's existing identity is recorded for accepted changes; commits retain Folio's last-editor-per-space behavior and may include other pending edits. There is no per-request Git commit or new audit-receipt store.
 
 | REST status / code | Meaning and action |
 |---|---|
@@ -56,6 +58,8 @@ Success confirms a Markdown file write/check and collaborative snapshot persiste
 | 400 `invalid_body_edit`, `invalid_body_text`, `frontmatter_not_allowed` | Invalid shape or body. No mutation. Schema-level validation can also return 400 before the guarded handler. |
 | 413 `body_edit_too_large` | Input or resulting body exceeds the limit. Schema-level character/count limits may return 400; HTTP size limits may return 413. |
 | 503 `body_persistence_failed` | The edit may already be live, but file/snapshot persistence was not confirmed. Returns `acceptedRevision`. Read back and inspect persistence before retrying; do not report saved or publish based on this error. |
+
+Browser connection/acknowledgement indicators describe transport and server receipt, not this API's file-persistence result or Git publication. A bot's 503 is not currently shown as a browser save error; an adapter must communicate the failure to its caller. No integrated bot conflict/retry UI is shipped here.
 
 MCP returns the same bounded guarded-error object as JSON text in an `isError` result. Invalid MCP schemas may instead return SDK validation errors. Authorization failures use existing interface semantics; they reveal no body or revision. Snapshot acquisition failures fail closed, preserving stored state.
 

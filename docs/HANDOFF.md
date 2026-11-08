@@ -203,7 +203,8 @@ claim attribution. Cookie body PUT and internal replacements remain legacy
 and unguarded. See [Shared agent editing](AGENT-EDITING.md).
 
 API-only rooms are reclaimed after inactivity; an API user holds a room until
-its operation finishes. Seeding waits for a closing room's persistence, and
+its operation finishes. Comment quote anchoring uses the same lease, preserving
+relative positions without an independent immediate room close. Seeding waits for a closing room's persistence, and
 writer flushes are serialized so older writes cannot finish after newer ones.
 Snapshot lookup/decode failures stop acquisition, remove only the failed
 unseeded room and preserve the stored snapshot. Never treat failure as absence
@@ -213,7 +214,13 @@ This local fork increment does not migrate bots or replace the existing
 multi-file publisher. Page/index/log writes through it are not atomic. Keep
 structured note request journals, selected-file publication, receipts,
 source exclusions, private scopes and approval policy on their current path.
-Published readers/indexes still consume Git, not the live body.
+Published readers/indexes still consume Git, not the live body. The feature branch
+merges deployment `971aaf4`, including MDX/comments and upstream deletion/binary
+conflict recovery; it does not restore the retired fork-only conflict ledger.
+Guarded edits retain opaque MDX source and unrelated snapshot roots. Browser
+acknowledgements remain receipt cues, not proof of file persistence/publication.
+Repeated conflicts under ongoing typing need bounded caller retries and
+reconsideration; no integrated bot conflict UI is included.
 
 The local checks and exact changed paths are recorded in
 [Guarded editing verification](verification/guarded-agent-editing.md).
@@ -265,6 +272,14 @@ editing, drawing), at the lower right corner of the selection frame, and the
 palette closes when the selection goes. `BoardCanvas` passes
 `canReact = canWrite && isEditingNow`: in View mode and for a read-only viewer
 the chips are shown but inert, and there is no add or remove.
+
+**Double-click into a shape** (`web/src/diagrams/boardDblclickText.ts`).
+Excalidraw binds a double-click's text to an empty, unfilled shape only near
+its centre or outline. A capture-phase `dblclick` listener on the board host
+asks `containerForDblclickText` for the topmost empty rectangle, ellipse or
+diamond under the point (arrows, lines and frames skipped) and opens that
+shape's text through the same sole-selection + Enter path as a new sticky note
+(`boardStickyEdit.ts`); anything else, and Alt, Ctrl or Cmd, goes to Excalidraw.
 
 Other people's carets and selections are drawn by Folio's own plugin,
 `web/src/editor/remote-selections.ts`, swapped in for the one that ships with
@@ -336,13 +351,6 @@ Plain TypeScript with no DOM lives in `shared/` so both sides import it.
   back keeps underline and highlight.
 
 ### Git synchronization
-
-The deployment fork retains unresolved paths in each clone's Git directory.
-Deletion and binary conflicts remain blocked across retries and restarts. A
-committed change to an affected file resolves it; unrelated edits do not.
-The existing take-from-Git recovery clears the record after a successful
-reset. The README's fork maintenance section records the upstream base and
-local patch inventory.
 
 Edits reach the file immediately. The commit is made after about 90 seconds of
 quiet in the space, with the last editor as its author. Spaces with a remote
@@ -525,6 +533,9 @@ added to this list and to `docs/INSTALL.md`.
   user agent and address. **The audit log** (`/admin/audit`, CSV streamed up to
   100,000 rows) shows what `audit_log` holds; every new action needs a label in
   both interface languages.
+  A space's own access log (`listAccessLogForSpace`) joins the user named by
+  `meta.targetUserId` and returns `meta.targetUserName`, so an `access.*` row
+  says whom it was about; write `targetUserId` on every new person-level event.
 
 ### Public sites
 
@@ -580,7 +591,7 @@ PostgreSQL, not in Git.
 
 ### Agents
 
-- **MCP** at `/mcp`, 45 tools, each with explicit `title` and
+- **MCP** at `/mcp`, 49 tools, each with explicit `title` and
   `readOnlyHint` / `destructiveHint` / `idempotentHint` / `openWorldHint`
   annotations, plus a short `instructions` text on `initialize`. `search` and `fetch` are read-only twins of `search_pages` and `read_page` with the same access rules; they exist because ChatGPT deep research and company knowledge only accept tools with exactly those names. Ready-made client setups live in `integrations/` (placeholders only), and `.claude-plugin/marketplace.json` makes the Claude Code plugin installable from this repository. It accepts a
   personal access token (`folio_pat_…`) or an OAuth access token

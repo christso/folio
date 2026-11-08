@@ -142,6 +142,25 @@ describe('guarded editing through actual storage, REST and MCP', () => {
     offline.destroy();
   });
 
+  it('edits an MDX paragraph while preserving opaque syntax, frontmatter and the MDX path', async () => {
+    const p = await page();
+    const entry = await storage.requireEntry(p.id);
+    const file = entry.absPath.replace(/\.md$/, '.mdx');
+    const frontmatter = `---\nid: ${p.id}\ntitle: External guide\nsource: "original"\n---\n`;
+    const body = 'import Card from "./Card.astro";\n\n# Guide\n\nA short paragraph.\n\n<Card label="Example">{2 + 2}</Card>\n';
+    await fs.rename(entry.absPath, file);
+    await fs.writeFile(file, frontmatter + body);
+    await storage.scanSpace(space);
+    const before = await read(p.id);
+    const from = before.markdown.indexOf('short');
+    await collab.editDocumentBody(p.id, { expectedRevision: before.revision, edits: [
+      { from, to: from + 5, expectedText: 'short', text: 'clear' },
+    ] }, author);
+    expect(await fs.readFile(file, 'utf8')).toBe(frontmatter + body.replace('short', 'clear'));
+    expect((await storage.requireEntry(p.id)).relPath).toMatch(/\.mdx$/);
+    await expect(collab.editDocumentBody(p.id, { expectedRevision: before.revision, markdown: 'stale' }, author)).rejects.toMatchObject({ status: 409 });
+  });
+
   it('uses the restored cold snapshot for reads, including exact final newline and pending edits', async () => {
     const p = await page();
     const saved = new Y.Doc();
@@ -154,6 +173,38 @@ describe('guarded editing through actual storage, REST and MCP', () => {
     await collab.bindState(p.id, reopened);
     expect(reopened.getText('content').toString()).toBe(before.markdown);
     reopened.destroy(); saved.destroy();
+  });
+
+  it('keeps cold comment anchoring and a guarded save on the same room and preserves the anchor', async () => {
+    const body = '# Page\n\nalpha beta gamma\n';
+    const p = await page(body);
+    const write = storage.writeDocBodyIfChanged;
+    let entered!: () => void;
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { entered = resolve; });
+    const hold = new Promise<void>((resolve) => { release = resolve; });
+    const spy = vi.spyOn(storage, 'writeDocBodyIfChanged').mockImplementation(async (...args) => {
+      if (args[0] === p.id) { entered(); await hold; }
+      return write(...args);
+    });
+    const anchoring = collab.anchorQuote(p.id, 'beta');
+    const saving = collab.editDocumentBody(p.id, { expectedRevision: bodyRevision(p.id, body), edits: [
+      { from: 8, to: 13, expectedText: 'alpha', text: 'ALPHA' },
+    ] }, author);
+    let anchor: Awaited<typeof anchoring>;
+    try {
+      await blocked;
+      const room = docs.get(p.id);
+      release();
+      [anchor] = await Promise.all([anchoring, saving]);
+      expect(docs.get(p.id)).toBe(room);
+      expect((await read(p.id)).markdown).toBe(body.replace('alpha', 'ALPHA'));
+    } finally { release(); spy.mockRestore(); await Promise.allSettled([anchoring, saving]); }
+    const restored = new Y.Doc();
+    Y.applyUpdate(restored, (await collab.loadSnapshot(p.id))!);
+    const resolve = (b64: string) => Y.createAbsolutePositionFromRelativePosition(Y.decodeRelativePosition(Buffer.from(b64, 'base64')), restored)!.index;
+    expect(restored.getText('content').toString().slice(resolve(anchor!.anchorFrom), resolve(anchor!.anchorTo))).toBe('beta');
+    restored.destroy();
   });
 
   it('refuses corrupt snapshots without replacing them or leaving a failed room open', async () => {
@@ -186,10 +237,14 @@ describe('guarded editing through actual storage, REST and MCP', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       before = await read(p.id);
+      docs.get(p.id)!.getMap('auxiliary').set('note', 'Keep this root');
+      await collab.editDocumentBody(p.id, { expectedRevision: before.revision, markdown: before.markdown + 'Kept body\n' }, author);
+      before = await read(p.id);
       await vi.advanceTimersByTimeAsync(30_000);
       expect(docs.has(p.id)).toBe(false);
     } finally { vi.useRealTimers(); }
     expect(await read(p.id)).toMatchObject({ markdown: before.markdown, revision: before.revision });
+    expect(docs.get(p.id)!.getMap('auxiliary').get('note')).toBe('Keep this root');
   });
 
   it('reports persistence failure without hiding the accepted live edit; retry is guarded', async () => {

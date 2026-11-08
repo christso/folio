@@ -1,10 +1,6 @@
 # Folio
 
-This is the deployment fork at [christso/folio](https://github.com/christso/folio).
-Our changes live on `deployment`; `main` stays at the upstream baseline.
-See [Fork maintenance](#fork-maintenance) for the patch list, recovery limits and update steps.
-
-**The vibe-coded, open-source alternative to Notion and Confluence.**
+**The open-source alternative to Notion and Confluence.**
 Your team's wiki lives in Git. People write in the browser, together, in real
 time. AI agents read and write the same pages. One command to run it yourself.
 
@@ -15,11 +11,6 @@ Website: <https://foliowiki.online> · Featured in [Self-Host Weekly (9 Oct 2026
 No install, no sign-up: open it and pick Sam on the sign-in screen. Shared login, data resets every 24 hours; don't enter personal data or API keys.
 
 ![Folio: a page with Folio AI at work, a whiteboard and a data table](docs/images/overview.png)
-
-Folio was built to replace Confluence and Notion for a real team — and it was
-built by AI agents, in the open. The plans, specs and hand-off notes the agents
-work from are in this repository, next to the code they wrote.
-[More on that below.](#vibe-coded-and-not-hiding-it)
 
 ```bash
 git clone https://github.com/evergreen-it-dev/folio.git
@@ -198,7 +189,11 @@ when someone edits it. A page's title comes from its first `#` heading, then
 from a front matter `title:`, then from the file name, and Folio does not add a
 heading to a page that has none. An `id` that another tool put in front matter
 (Docusaurus and Jest use `id: intro`) never moves a page between spaces. MDX
-files (`.mdx`) are not pages; the scan logs how many it skipped. Pasted images
+files (`.mdx`: Nimbus, Starlight, Astro, Docusaurus) are pages like `.md`
+ones: `import`/`export` lines and JSX components such as `<Aside>` or `<Tabs>`
+are folded into compact blocks in Live edit, drawn as labelled boxes in Reading,
+and saved back byte for byte — Folio does not run MDX, it only keeps it intact.
+Pasted images
 stay in Folio's asset store until a space administrator turns on "Store images
 in the repository". See also [What is not there yet](docs/LIMITATIONS.md).
 
@@ -220,6 +215,12 @@ edited as the author.
 What you type is not lost between Live edit and Reading: the browser keeps a
 local copy until the server confirms it has your edits. If it cannot confirm
 them, the header says **Not saved** and closing the tab asks first.
+
+**Comments on text.** Select a passage in a document and press **Comment**: the
+thread sits beside the page, anyone who can see the page can reply, and an
+editor (or the person who started it) resolves it. Comments are kept in the
+database, not in the Markdown, so Git history stays clean. Agents read and
+answer them through MCP.
 
 ---
 
@@ -589,6 +590,19 @@ Folio pages, not as configuration.
 The instructions apply to every run in the space, in Ask and Agent modes
 alike.
 
+**Writing rules, checked before you ship.** Put a page named
+`writing-rules` in `.agent` (administrators get a "Create writing rules"
+button that adds a starter: plain language, one idea per paragraph, headings
+as nouns, no marketing words, define acronyms, numbered steps) and every page
+of the space can be linted against it, whoever wrote it. Open a page and choose
+**Check against writing rules**: the assistant runs read-only and lists each
+finding with the rule it breaks, the quoted fragment and a suggested rewrite;
+**Fix with Agent** hands the findings to Agent mode, which edits only those
+fragments. The check needs the rules page and a working Folio AI key; without
+them the button is missing or disabled with the reason. External agents (Claude
+Code, Cursor) call the MCP tool `check_page_writing_rules` to get the same
+rules and the page before they write.
+
 ### Bring your own key
 
 Folio does not resell AI and does not mark it up. The assistant runs on a
@@ -616,11 +630,11 @@ Without a key everything else in Folio works as usual.
 
 ## Built for agents
 
-**MCP server.** 45 tools over `/mcp`: list and search spaces, read and write
+**MCP server.** 49 tools over `/mcp`: list and search spaces, read and write
 pages, build forms, edit data table columns and views, convert a canvas to a board, read a page's outline, tags, properties and links, list a space's tags and
 property keys, rename a tag, set page properties, find unresolved links
 and orphan pages, read the link graph, query, create and edit Obsidian bases, create and edit whiteboards, publish interactive artifacts, list templates and create pages from them, query and update data tables,
-read history.
+read history, read and write comment threads, check a page against the space's writing rules.
 Connect with a personal access token, or through OAuth 2.1 from clients that
 run in a vendor's cloud (claude.ai, Claude Desktop, ChatGPT). `search` and
 `fetch` are there for ChatGPT deep research.
@@ -890,31 +904,6 @@ optional recording of recent actions with all text masked, off with
 
 ---
 
-## Vibe-coded, and not hiding it
-
-Folio is written by AI coding agents. A human product owner decides what to
-build, tries every change in the browser and decides what ships; agents plan
-the work, write the code and the tests, and document what they did.
-
-From the first commit on August 21, 2026 to version 0.1.0 on September 29,
-2026 took 39 days and more than 400 commits upstream. Version 0.2.0 followed on
-October 14, 2026, 54 days in. Today that is roughly 110,000 lines of TypeScript
-and another 70,000 lines of tests. It runs in production for a real team.
-
-We publish how it is made, not only what was made:
-
-| File | What it is |
-|---|---|
-| [AGENTS.md](AGENTS.md) | How the work is organized and the rules agents follow in this repository |
-| [docs/HANDOFF.md](docs/HANDOFF.md) | The current state: how Folio is put together, what must never break, what is open, and the lessons that cost us something to learn |
-| [DEV-PLAN.md](DEV-PLAN.md) | What has been built, in the order it was built, and what comes next |
-
-If you are building with agents yourself, this repository is a worked example
-of a non-trivial product made that way. If you only want a wiki, none of it
-gets in your way.
-
----
-
 ## Documentation
 
 - [Website: foliowiki.online](https://foliowiki.online)
@@ -956,95 +945,16 @@ vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 ## Fork maintenance
 
 This fork follows [evergreen-it-dev/folio](https://github.com/evergreen-it-dev/folio).
-The current upstream base is `9a4b30b9065fa1dc05b8bcec2fe75f7710a430cf`
-(package version 0.4.2). `main` tracks upstream; `deployment` contains the
-changes we run. Pin a tested commit or image digest when deploying.
+`main` tracks upstream; `deployment` is the integration base for this fork.
+Pin a tested commit or image digest when deploying.
 
-The application fix is isolated in [0e1e0d9](https://github.com/christso/folio/commit/0e1e0d9a6a6384e9d04249fc3c49aa714dd6598b).
-The README notes are a separate commit, so the fix can be reviewed or
-cherry-picked without fork-specific documentation.
+The guarded document editing increment is described in
+[Shared agent editing](docs/AGENT-EDITING.md), with
+[verification and remaining integration work](docs/verification/guarded-agent-editing.md).
+It adds revision preconditions to external document writes and preserves the
+existing collaboration, permissions and publication boundaries. No live caller
+has migrated merely because this patch exists.
 
-### What differs
-
-| Change | Files | Upstream status |
-|---|---|---|
-| Guard shared document editing for external agents with exact body revisions and ranges, restored Yjs state and explicit persistence results | `server/documentEdits.ts`, `server/collab.ts`, REST/MCP contracts and tests; [integration guide](docs/AGENT-EDITING.md) | Local increment; owner review and caller migration pending |
-| Keep unresolved Git conflicts blocked across retries and restarts, including deletions and binary replacements | `server/gitConflictState.ts`, small changes in `server/git.ts` and `server/gitSync.ts`, regression coverage in `server/gitMerge.test.ts` and `server/gitNative.test.ts` | Local fix; not submitted upstream yet |
-| Describe this fork and its maintenance | This section and the notice at the top of the README | Fork only |
-
-The fix records unresolved paths inside each clone's Git directory, in
-`folio-conflicts.json`. That record stays out of wiki commits. It prevents a
-later manual Sync, background retry or graceful restart from publishing a
-merge merely because its files contain no text conflict markers. The
-existing conflict list also shows affected pages and attachments.
-
-To resolve a conflict, make a checked change to the affected file and Sync,
-including deleting it again if deletion is the intended result. Changing an
-unrelated page does not resolve it. For text conflicts, remove the markers
-and keep the intended content as usual. Alternatively, use **Take the version
-from Git**: it backs up the local state before restoring the remote version.
-
-Saving identical bytes does not acknowledge a deletion or binary conflict.
-Keeping that exact version without a content change has no separate
-acceptance button in this fix. If recording the conflict was interrupted,
-or its local record is damaged, use **Take the version from Git** to recover.
-Back up each clone's full Git directory along with the rest of Folio's data.
-The fix protects newly recorded conflicts; it does not undo merges already
-published by an older image or reconstruct records that image never saved.
-
-### Updating from upstream
-
-Keep the application fix and fork documentation in separate commits. Submit
-only the fix and its tests upstream. Keep hostnames, credentials, wiki
-content and deployment policy outside this public repository.
-
-Add an `upstream` remote once, then merge updates without rewriting published
-history:
-
-```bash
-git remote add upstream https://github.com/evergreen-it-dev/folio.git
-git fetch upstream
-git switch main
-git merge --ff-only upstream/main
-git switch deployment
-git merge main
-```
-
-Before publishing an update, inspect `git log --oneline main..deployment`
-and `git diff main...deployment`. Update the base above and the patch table,
-resolve any conflicts, and repeat the focused tests, type check, build and
-running-container checks. If upstream includes an equivalent fix, verify it
-against these cases before removing our implementation; retain useful tests.
-
-### Building the deployment image
-
-Build from `deployment` at the exact commit you intend to run. This uses the
-upstream Dockerfile and includes the source fix; the upstream published image
-does not contain our changes.
-
-```bash
-git switch deployment
-revision=$(git rev-parse HEAD)
-docker build --build-arg FOLIO_RELEASE="$revision" \
-  -t "folio-fork:sha-$revision" .
-```
-
-Use that image in your deployment configuration, or build and start the
-bundled stack with `docker compose up -d --build`. Keep the preceding image
-and a verified data/database backup for recovery. Reverting to an upstream
-image also removes this conflict protection.
-
-Validation commands (the integration tests need PostgreSQL and Redis):
-
-```bash
-npm ci
-npm run typecheck
-npx vitest run server/gitMerge.test.ts server/gitNative.test.ts \
-  server/connectGit.test.ts server/replaceFilePage.test.ts
-npm run build
-```
-
-The running-container checks cover deletion versus editing in both
-directions, independent PDF replacements, repeated and automatic Sync,
-restart while conflicted, explicit recovery, and an open browser receiving a
-clean merge. These use disposable repositories and synthetic content.
+Deployment now includes upstream's durable deletion and binary conflict recovery,
+including explicit per-file resolution. The earlier fork-only conflict patch has
+been retired in favor of that implementation; this feature preserves it.
