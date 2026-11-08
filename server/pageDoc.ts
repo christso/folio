@@ -22,8 +22,8 @@ export async function buildPageDoc(entry: PageIndexEntry, reader: CanvasReader =
   const meta = storage.toPageMeta(entry);
   if (entry.kind === 'doc') {
     // A live collaboration room is authoritative over the file (the debounced write may be behind).
-    const markdown = collab.isDocLive(entry.id) ? (collab.getLiveText(entry.id) ?? entry.body ?? '') : await storage.readFreshDocBody(entry.id);
-    return storage.isLightFootprintSpace(entry.space) ? { ...meta, markdown, lightFootprint: true } : { ...meta, markdown };
+    const body = await collab.readDocumentBody(entry.id);
+    return storage.isLightFootprintSpace(entry.space) ? { ...meta, ...body, lightFootprint: true } : { ...meta, ...body };
   }
   // Round 26: a table's content rides these routes as `markdown` (the whole
   // .table.md, schema included) — PageDoc is deliberately NOT extended for tables.

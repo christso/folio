@@ -6,6 +6,11 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
 
 ### Added
 
+- Optional exact page-location preconditions on guarded document edits and
+  page reads. Callers can refuse a page that moved after they checked its
+  location. Same-process structural coordination remains active when Redis
+  is unavailable; these preconditions do not grant page access.
+
 - **Public sites are readable by AI agents.** Every published site now serves
   `llms.txt` (title, summary and a list of its pages grouped by section, each
   with a link to the page's Markdown and a one-line description taken from the
@@ -77,6 +82,21 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
   no 3.x release with the fix.
 
 ### Fixed
+
+- Guard external document edits with the exact body revision returned by REST
+  or MCP reads. Stale replacements and invalid exact ranges fail without
+  overwriting newer edits; accepted changes use the existing Yjs room and
+  confirm file/snapshot persistence separately from Git publication. Legacy
+  unguarded bot body updates now require a revision; cookie PUT remains legacy.
+  Snapshot acquisition fails closed and overlapping persistence is serialized.
+  Comment anchors share the room lease and confirm durable identities; writing
+  rule checks wait for cold rooms to finish restoring.
+- Separate browser document connection/receipt from exact file and snapshot
+  confirmation and unverified Git publication. Retain failed-save recovery
+  copies, show bounded-retry guidance, and let editors retry the current writer.
+  Offline cues now agree. Add exact unique-passage REST/MCP editing during
+  unrelated typing and bounded reread/reconsideration in the supported assistant.
+  Existing strict revision edits and publication policy remain unchanged.
 
 - **Git sync no longer publishes an unresolved deletion or binary conflict.**
   When Folio deleted a page that Git edited (or the reverse), or both sides

@@ -93,7 +93,7 @@ Clients are public (no client secret). Redirect URIs must be `https`, or `http` 
 | Data tables (scope `write`) | `folio_table_insert`, `folio_table_update`, `folio_table_delete`, `folio_table_add_column`, `folio_table_update_column`, `folio_table_delete_column`, `folio_table_save_view`, `folio_table_delete_view`, `folio_table_create` |
 | Forms (scope `write`) | `create_form`, `update_form` (read a form with `read_page`) |
 
-49 tools: 23 read-only, 26 that write.
+50 tools: 23 read-only, 27 that write.
 
 **Comments.** `list_comments(page, status?)` returns a document's inline comment threads (`id`, quoted text, `status` open or resolved, the comments oldest first) and whether you may reply; `add_comment(page, quote, body)` starts a thread on the first occurrence of `quote` in the page's current Markdown (copy it exactly from `read_page`; an error when it is not found); `reply_comment(threadId, body)` answers a thread. The author is the token's owner. Comments are not part of the page's Markdown or Git. Refused on public sites.
 
@@ -136,7 +136,7 @@ Send the page as ONE self-contained document in `html`: no build step and no ser
 
 **Table columns and views.** `folio_table_update_column(id, columnId, name?, type?, description?, options?, …)` changes one column like the column menu: a type change converts the values and returns `{column, converted, cleared}`; `options` is the whole new list. `folio_table_delete_column(id, columnId)` deletes a column and its values. `folio_table_save_view(id, viewId?, name?, filter?, sort?, hiddenColumns?, columnOrder?, frozen?, rowHeight?)` adds a view (a tab with its own filter, sort and columns; `name` required) or, with `viewId`, changes only the fields given; column ids it names must exist. `folio_table_delete_view(id, viewId)` deletes a view, never the last one. A `status` column added with `folio_table_add_column` or `folio_table_create` without options gets the status preset, as in the web app.
 
-**Obsidian bases.** A base (`kind: "base"`, an Obsidian `.base` file) is a saved query over the pages of its space. `query_base(id, view?, limit?, offset?)` runs one view of it and returns `view`, `views`, `columns` (`id`, `label`), `rows` (`id`, `title`, `path`, `values` keyed by column id, and `group` when the view is grouped), `groups` (`key`, `count`), `summaries`, `total`, `truncated`, `warnings` and, when the file cannot be read, `error`. `view` is a view name (the first one when omitted), `limit` is 1 to 500 (default 100), `offset` pages through the rows. Only pages the token's owner can open are rows. A value Folio cannot evaluate comes back as `#unsupported: …` or `#error: …`. The tool is read-only: change a value with `update_page` on that page's front matter. `read_page` on a base returns its YAML (filters, formulas, views) with a hint to call `query_base`, and `fetch` renders the rows as a Markdown table. On public sites `query_base` is refused, because a base exposes page properties.
+**Obsidian bases.** A base (`kind: "base"`, an Obsidian `.base` file) is a saved query over the pages of its space. `query_base(id, view?, limit?, offset?)` runs one view of it and returns `view`, `views`, `columns` (`id`, `label`), `rows` (`id`, `title`, `path`, `values` keyed by column id, and `group` when the view is grouped), `groups` (`key`, `count`), `summaries`, `total`, `truncated`, `warnings` and, when the file cannot be read, `error`. `view` is a view name (the first one when omitted), `limit` is 1 to 500 (default 100), `offset` pages through the rows. Only pages the token's owner can open are rows. A value Folio cannot evaluate comes back as `#unsupported: …` or `#error: …`. The tool is read-only: change a value with `set_page_properties` and its ETag. `read_page` on a base returns its YAML (filters, formulas, views) with a hint to call `query_base`, and `fetch` renders the rows as a Markdown table. On public sites `query_base` is refused, because a base exposes page properties.
 
 `save_base(space, yaml, path?, id?, etag?)` creates or updates a base. Give `path` (for example `views/tasks.base`: it must end in `.base` and must not exist; folders are created) to create one, or `id` of an existing base to replace its YAML, optionally with the `etag` of the file as you read it. `yaml` is the whole file. It is checked with the same parser as the web app's editor before anything is written: invalid YAML, or a file over 256 KB, comes back as an error with the line number (`not a valid base: … (line 3)`). The YAML is stored as you wrote it, so keys this version does not know are kept; parts that are read leniently (a filter of an unknown shape) are listed in `warnings`. It returns `{"id", "space", "path", "created", "written", "etag", "warnings", "preview"}` where `preview` is the first view answered like `query_base` does, limited to 10 rows (only pages you can open are rows). It needs an editor role and a `write` token.
 
@@ -161,6 +161,21 @@ Operator names are case-insensitive, and an unknown `something:else` is an ordin
 **Structured results.** Every tool declares an `outputSchema` in `tools/list` and returns its result as `structuredContent` (MCP spec 2025-06-18) in addition to the same data as JSON text in `content`, so clients that do not read structured content keep working unchanged. The schema root is always an object, so a tool whose answer is a list wraps it under one key in `structuredContent`: `list_spaces` → `{"spaces": [...]}`, `list_tree` → `{"tree": [...]}`, `search_pages` → `{"hits": [...]}`, `get_backlinks` → `{"backlinks": [...]}`, `list_orphans` → `{"pages": [...]}`, `list_tags` → `{"tags": [...], ...}`, `list_properties` → `{"properties": [...], ...}`, `get_graph` → `{"nodes": [...], "edges": [...], ...}`, `page_history` → `{"revisions": [...]}`, `folio_table_list` → `{"tables": [...]}`; the text form stays the bare array. `folio_table_query` with `format: "markdown"` returns `{"markdown", "total"}`. A failed call is an ordinary `isError` result with a text message and no structured content.
 
 **Tool names.** Names are `snake_case`; the data-table tools share the `folio_table_` prefix, and `search` / `fetch` keep the exact names ChatGPT requires. Some catalogs (Smithery's "Naming" check) prefer dot-separated hierarchical names such as `table.query`. Folio does not use them: Claude, OpenAI and most other clients only accept tool names matching `[a-zA-Z0-9_-]`, and renaming would break every existing connection and saved prompt. The names stay as they are.
+
+## Guarded document editing
+
+`read_page`, `fetch` and REST document GET return the exact body and a `revision`.
+`update_page(id, expectedRevision, markdown)` replaces that body only if it is still current.
+Alternatively pass `edits: [{from, to, expectedText, text}]` instead of `markdown`: exact, nonoverlapping UTF-16 ranges against the original body.
+The REST equivalent is `PUT /api/pages/:id` with the same body fields.
+Both use the restored live Yjs document and reject stale revisions without mutation.
+Use LF, no frontmatter, at most 100 edits and 1 MiB of edit text/result.
+
+Legacy unguarded MCP and PAT document replacements now fail; cookie REST replacements remain legacy and unguarded.
+Success returns `revision`, `changed`, `persistence: "file"`, `publication: "pending"` alongside page metadata.
+File/snapshot persistence is distinct from Git publication and indexing.
+Read back after writing or an uncertain response; never blindly retry an insertion.
+See [Shared agent editing](AGENT-EDITING.md) for requests, bounded conflict errors, compatibility, retries, publication approvals and the migration boundary for multi-page and structured note saves.
 
 ## REST: what MCP does not cover
 
@@ -218,13 +233,13 @@ ordinary user content; it must not be executed.
 creates a starter page: a document holds just the title as an `# H1`, a table
 gets `columns` (table only) or none. A `markdown` field is not part of that
 request and is silently ignored, so write the content with the next
-`PUT /api/pages/:id {markdown}`. (The request also takes `id` and `ydocState`,
+`PUT /api/pages/:id {expectedRevision, markdown}` after reading its revision. (The request also takes `id` and `ydocState`,
 but those are for the web client creating a page offline, not for agents.)
 The MCP `create_page` tool differs: it takes an optional `markdown` for a
 document (`kind` omitted or `"doc"`) and writes it right after creating the
 page, and an optional `columns` for `kind: "table"`, where `markdown` is
 ignored. It cannot create a whiteboard: use `create_board`. To change the text
-of an existing page, use `update_page` over MCP or `PUT /api/pages/:id`.
+of an existing page, read it first, then use guarded `update_page` over MCP or `PUT /api/pages/:id`.
 
 **A page's title is the first `# H1` of its text.** So when `create_page`
 gets a `markdown` that does not open with an H1, it puts `# <title>` above it
@@ -263,3 +278,17 @@ which state the reason.
 For a large number of changes the cheaper and more reliable way is
 `git clone` → local edits → `git push` → `POST /api/spaces/:space/sync`. The
 index is rebuilt from the files automatically.
+
+## Exact passage edits and bounded recovery
+
+`replace_page_text(id, oldText, newText)` is the additive document passage tool; REST offers `POST /api/pages/:id/replace-text` with `oldText` and `newText`. It replaces one exact, nonempty, unique quotation in the current body, permitting unrelated typing. The resulting body must consume the source quotation on changes; missing/ambiguous/recreated quotations fail without mutation. This is explicit location-independent intent, with the same body limits, access, attribution and file/publication results as guarded updates. Strict `update_page` revisions remain required.
+
+`read_page`, `update_page` and `replace_page_text` additionally accept optional
+`expectedLocation: {space, path}` from exact page metadata. A concurrent move or
+rename produces `location_conflict` without content or actual-location disclosure.
+REST GET uses `expectedSpace` and `expectedPath` together; guarded PUT and
+replace-text use the same `expectedLocation` body field. This precondition is
+coordinated with structural operations in Folio's server process, including
+Redis's degraded path. It does not replace authorization or client scope checks.
+
+The built-in assistant returns complete authorized conflict context and enforces a shared two-conflict page/run budget. Unknown outcomes block writes until an explicit complete read, and two uncertain write outcomes stop further body writes for that page/run even if reads interleave. Incomplete reads supply no revision. External clients must implement equivalent bounded recovery themselves. See [Shared agent editing](AGENT-EDITING.md) for the precise matching, retry and publication contract.

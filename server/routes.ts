@@ -69,6 +69,8 @@ import type {
 } from '../shared/contracts.js';
 import * as storage from './storage.js';
 import * as collab from './collab.js';
+import { DocumentEditError } from './documentEdits.js';
+import { withPageLocation } from './pageLocation.js';
 import { decodeScenePayload, extractScenePayload } from './confluenceWhiteboard.js';
 import * as tables from './tables/service.js';
 import * as forms from './forms/service.js';
@@ -951,10 +953,32 @@ export function registerRoutes(app: FastifyInstance): void {
     return meta;
   });
 
-  app.get('/api/pages/:id', async (request) => {
+  app.post('/api/pages/:id/replace-text', async (request, reply) => {
+    session.requireWriteScope(request);
     const { id } = request.params as { id: string };
+    const entry = await session.requirePageRole(request, id, 'editor');
+    if (entry.kind !== 'doc') throw badRequest('replace-text only supports documents');
+    const user = request.authUser!;
+    try { return await collab.replaceDocumentText(id, request.body, { name: user.name, email: user.email }, async () => { await session.requirePageRole(request, id, 'editor'); }); }
+    catch (err) { if (err instanceof DocumentEditError) return reply.status(err.status).send(err.toJSON()); throw err; }
+  });
+
+  app.get('/api/pages/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { expectedSpace, expectedPath } = request.query as { expectedSpace?: string; expectedPath?: string };
+    const expected = expectedSpace === undefined && expectedPath === undefined ? undefined : { space: expectedSpace, path: expectedPath };
+    // Keep the normal denial before checking or disclosing a page location.
     const entry = await session.requirePageRole(request, id, 'viewer');
-    return buildPageDoc(entry, userViewer(request.authUser!));
+    if (expected === undefined) return buildPageDoc(entry, userViewer(request.authUser!));
+    try {
+      return await withPageLocation(id, expected, async () => {
+        const fresh = await session.requirePageRole(request, id, 'viewer');
+        return buildPageDoc(fresh, userViewer(request.authUser!));
+      });
+    } catch (err) {
+      if (err instanceof DocumentEditError) return reply.status(err.status).send(err.toJSON());
+      throw err;
+    }
   });
 
   /** Obsidian canvas: the parsed `.canvas` with its file cards resolved for this reader — the same object PageDoc.canvas carries (server/canvasView.ts). */
@@ -1133,12 +1157,23 @@ export function registerRoutes(app: FastifyInstance): void {
     return pageAccess.getInfo(request.authUser!, entry, role!);
   });
 
-  app.put('/api/pages/:id', async (request) => {
+  app.put('/api/pages/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = parseBody(updatePageBodySchema, request.body);
     const entry = await session.requirePageRole(request, id, 'editor');
     session.requireWriteScope(request);
     const user = request.authUser!;
+
+    if (body.expectedLocation !== undefined || body.expectedRevision !== undefined || body.edits !== undefined || (entry.kind === 'doc' && body.markdown !== undefined && request.tokenScopes !== undefined)) {
+      if (entry.kind !== 'doc') throw badRequest('guarded body edits only support document pages');
+      try {
+        // Pass the original object: guarded bodies reject metadata/unknown fields.
+        return await collab.editDocumentBody(id, request.body, { name: user.name, email: user.email }, async () => { await session.requirePageRole(request, id, 'editor'); });
+      } catch (err) {
+        if (err instanceof DocumentEditError) return reply.status(err.status).send(err.toJSON());
+        throw err;
+      }
+    }
 
     if (entry.kind === 'doc') {
       if (body.markdown === undefined && body.icon === undefined && body.cover === undefined && body.order === undefined) {
@@ -1151,9 +1186,7 @@ export function registerRoutes(app: FastifyInstance): void {
         // the Yjs body, so none of this would otherwise ever flow through write-back.
         const icon = storage.resolveIconCoverOverride(body.icon, entry.icon);
         const cover = storage.resolveIconCoverOverride(body.cover, entry.cover);
-        const currentBody = collab.isDocLive(id)
-          ? (collab.getLiveText(id) ?? (await storage.readFreshDocBody(id)))
-          : await storage.readFreshDocBody(id);
+        const currentBody = (await collab.readDocumentBody(id)).markdown;
         if (body.order !== undefined) await storage.setDocOrder(entry, body.order, currentBody);
         await storage.setDocIconCover(entry, icon, cover, currentBody);
         gitSync.noteActivity(entry.space);

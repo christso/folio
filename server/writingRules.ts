@@ -36,9 +36,9 @@ export async function findWritingRulesEntry(space: string): Promise<PageIndexEnt
   return (await storage.listEntries(space)).find((e) => e.relPath === WRITING_RULES_PATH && e.kind === 'doc');
 }
 
-/** Current text of a document: what is on screen when someone is editing it live, else the file. */
+/** Current document text, after its existing collaborative snapshot has been restored. */
 export async function docMarkdown(entry: PageIndexEntry): Promise<string> {
-  return collab.isDocLive(entry.id) ? (collab.getLiveText(entry.id) ?? entry.body ?? '') : storage.readFreshDocBody(entry.id);
+  return (await collab.readDocumentBody(entry.id)).markdown;
 }
 
 /**

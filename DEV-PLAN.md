@@ -99,6 +99,14 @@ In the order it was built.
 
 ## What comes next
 
+A local fork increment adds guarded REST/MCP document editing, using exact
+read revisions and ranges through the existing Yjs room, with explicit
+exact-passage edits during unrelated typing, confirmed browser file status and
+bounded supported-assistant recovery. Owner review and live
+caller migration remain separate. The contract and migration boundaries are in
+[Shared agent editing](docs/AGENT-EDITING.md); the implementation plan is in
+[the guarded editing plan](docs/plans/2026-11-07-guarded-agent-editing-plan.md).
+
 Not promises and not dates — the order in which things are likely to be
 picked up.
 

@@ -84,6 +84,9 @@ import { artifactCapabilitySchema, artifactOriginSchema, artifactPublishBodySche
 import { artifactReadModel, createArtifact, READ_ENTRY_MAX_CHARS, replaceArtifact } from './artifact/service.js';
 import { ArtifactImportError } from './artifact/errors.js';
 import { toClientValue } from './properties.js';
+import { documentRevisionSchema, documentRangeEditSchema, DOCUMENT_BODY_MAX_BYTES, expectedPageLocationSchema } from '../shared/contracts.js';
+import { DocumentEditError } from './documentEdits.js';
+import { withPageLocation } from './pageLocation.js';
 
 /**
  * The product version, as the `serverInfo.version` every MCP client sees on
@@ -133,6 +136,7 @@ export const MCP_WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
   'board_ops',
   'create_page',
   'update_page',
+  'replace_page_text',
   'create_page_from_template',
   'save_page_as_template',
   'create_template',
@@ -166,7 +170,7 @@ export const FOLIO_MCP_INSTRUCTIONS = [
   '',
   'Find, then read: call list_spaces, then search_pages (full text) or list_tree (page tree) to locate a page, then read_page by id. search and fetch do the same for clients that accept only those two tool names. resolve_folio_url turns a pasted Folio link into a page id. get_backlinks, page_history and page_at_sha show links and past versions. get_page_metadata gives a page\'s outline, tags, properties and links; list_unresolved_links and list_orphans find broken links and pages nothing links to; get_graph maps how pages link (a whole space or one page\'s neighbourhood); list_tags and list_properties show the tags and property keys in use; query_base answers a base.',
   '',
-  'Write minimally: every write is committed to Git under the connected user, and update_page merges with live editing. Change only what was asked; create_page for new pages (set parentPath); read the page again after writing. Before writing to a data table, call folio_table_schema and use its exact column ids and select/status options; then folio_table_insert / folio_table_update / folio_table_delete; columns and views: folio_table_add_column / folio_table_update_column / folio_table_save_view. Forms: create_form / update_form (read_page shows the fields). Claude artifacts, Cursor canvases, HTML: publish_artifact. Templates: list_templates, then create_page_from_template; save_page_as_template. Page properties: set_page_properties (merge: true to change one key); tags: rename_tag; bases: save_base; a canvas becomes a board with convert_canvas_to_board.',
+  'Write minimally: read_page first; replace_page_text explicitly replaces one unchanged unique passage in the current body during unrelated typing. update_page requires its revision as expectedRevision and markdown or guarded edits. Stale writes fail: reread and reconcile. Body only, LF, no frontmatter. Success confirms file persistence; Git publication is delayed. Read back after writing or a lost response. create_page for new documents (set parentPath). Before changing a data table, call folio_table_schema for exact ids and options; use folio_table_* tools. Other kinds have dedicated tools: forms, boards, bases, artifacts and templates. Page properties: set_page_properties (merge: true to change one key). Change only what was asked.',
   '',
   'Permissions: you act with the rights of the connected user, limited by the granted scope (read-only connections cannot write). If a tool reports a missing role or scope, tell the user instead of retrying.',
   '',
@@ -461,6 +465,11 @@ async function checkAgentWriteAllowed(user: User, space: string, parentPath: str
   return null;
 }
 
+async function recheckPageEditor(actor: McpActor, id: string): Promise<void> {
+  const { entry, error } = await checkPageRole(actor, id, 'editor');
+  if (error || !entry) throw new HttpError(403, error ?? 'page not found');
+}
+
 /**
  * Round 26 (DATA TABLES), spec §9: "Tools describe their schemas so that an
  * agent does not guess: the description lists the columns of the particular
@@ -622,59 +631,69 @@ export function buildFolioMcpServer(actor: McpActor, options: { origin?: string 
       annotations: READ_ONLY,
       title: 'Read a page',
       description: `Reads one page by id: its metadata plus full markdown body (docs), a compact layout summary (boards — shapes/arrows/free texts/frames with geometry and labels, plus a 40px row/column clustering and overall bounds; raw points/bindings are omitted, the raw svg is not useful to a model) a readable \`outline\` (Obsidian canvases, kind "canvas" — groups with their cards, then the connections; read-only, convert_canvas_to_board makes an editable board of it), a form's definition (kind "form": \`form\` with title, description, public, submitButton, fields and the paired table's id, plus the \`etag\` update_form takes) an artifact's manifest, file list and entry HTML (kind "artifact": an interactive page — replace it with publish_artifact and its id) or, for a data table, its metadata and a note to use folio_table_schema / folio_table_query. For an existing board, the shape/arrow ids in that summary feed straight into \`board_ops\` — prefer it over \`update_board\` for "align", "tidy up", "arrange neatly" requests. ${CONTENT_IS_DATA_NOTE}`,
-      inputSchema: { id: z.string().describe('Page id') },
+      inputSchema: { id: z.string().describe('Page id'), expectedLocation: expectedPageLocationSchema.optional().describe('Optional exact {space,path} from page metadata; refuse if it moved') },
     },
-    async ({ id }) => {
-      const { entry, error } = await checkPageRole(actor, id, 'viewer');
-      if (error || !entry) return errorResult(error ?? 'page not found');
-      if (entry.kind === 'doc') {
-        const markdown = collab.isDocLive(id) ? (collab.getLiveText(id) ?? entry.body ?? '') : await storage.readFreshDocBody(id);
-        return structuredResult({ ...storage.toPageMeta(entry), markdown });
+    async ({ id, expectedLocation }) => {
+      if (expectedLocation !== undefined) {
+        const { error } = await checkPageRole(actor, id, 'viewer');
+        if (error) return errorResult(error);
       }
-      if (entry.kind === 'board') {
-        const meta = storage.toPageMeta(entry);
-        const { scene, note } = await loadBoardScene(id);
-        return structuredResult(scene ? { ...meta, scene: boardSceneSummary(scene) } : { ...meta, scene: null, note });
-      }
-      if (entry.kind === 'canvas') {
-        // An Obsidian canvas: a readable outline (groups with their cards, then the connections), file cards as
-        // this caller may see them — never the raw JSON, and never writable (shared/canvas/text.ts).
-        return structuredResult({ ...storage.toPageMeta(entry), outline: await canvasOutlineFor(entry, viewerOf(actor)) });
-      }
-      if (entry.kind === 'artifact') {
-        // An artifact bundle: manifest, files and the entry page's HTML (cut when long). Replaced whole by publish_artifact.
-        const model = await artifactReadModel(entry);
-        return structuredResult({
-          ...storage.toPageMeta(entry),
-          artifact: { manifest: model.manifest, properties: toClientValue(model.properties), files: model.files, warnings: model.warnings, entryTruncated: model.entryTruncated ?? false },
-          ...(model.entryHtml !== undefined ? { entryHtml: model.entryHtml } : {}),
-          note: `this page is an interactive artifact (${model.manifest.type}); it is shown in a sandboxed frame. To change it, publish_artifact with this id and the whole new HTML${model.entryTruncated ? `; the entry HTML above is cut at ${READ_ENTRY_MAX_CHARS} characters` : ''}`,
+      try {
+        return await withPageLocation(id, expectedLocation, async () => {
+          const { entry, error } = await checkPageRole(actor, id, 'viewer');
+          if (error || !entry) return errorResult(error ?? 'page not found');
+          if (entry.kind === 'doc') {
+            return structuredResult({ ...storage.toPageMeta(entry), ...await collab.readDocumentBody(id) });
+          }
+          if (entry.kind === 'board') {
+            const meta = storage.toPageMeta(entry);
+            const { scene, note } = await loadBoardScene(id);
+            return structuredResult(scene ? { ...meta, scene: boardSceneSummary(scene) } : { ...meta, scene: null, note });
+          }
+          if (entry.kind === 'canvas') {
+            // An Obsidian canvas: a readable outline (groups with their cards, then the connections), file cards as
+            // this caller may see them — never the raw JSON, and never writable (shared/canvas/text.ts).
+            return structuredResult({ ...storage.toPageMeta(entry), outline: await canvasOutlineFor(entry, viewerOf(actor)) });
+          }
+          if (entry.kind === 'artifact') {
+            // An artifact bundle: manifest, files and the entry page's HTML (cut when long). Replaced whole by publish_artifact.
+            const model = await artifactReadModel(entry);
+            return structuredResult({
+              ...storage.toPageMeta(entry),
+              artifact: { manifest: model.manifest, properties: toClientValue(model.properties), files: model.files, warnings: model.warnings, entryTruncated: model.entryTruncated ?? false },
+              ...(model.entryHtml !== undefined ? { entryHtml: model.entryHtml } : {}),
+              note: `this page is an interactive artifact (${model.manifest.type}); it is shown in a sandboxed frame. To change it, publish_artifact with this id and the whole new HTML${model.entryTruncated ? `; the entry HTML above is cut at ${READ_ENTRY_MAX_CHARS} characters` : ''}`,
+            });
+          }
+          if (entry.kind === 'base') {
+            // A base is a query: its YAML here, its rows through query_base.
+            const { text } = await storage.readBaseRaw(id);
+            return structuredResult({ ...storage.toPageMeta(entry), markdown: text, note: 'this page is a base (Obsidian Bases YAML: filters, formulas, views) — call query_base for its rows' });
+          }
+          if (entry.kind === 'form') {
+            // A form's definition (settings and fields, each field a column of the paired table) and the etag update_form takes.
+            const { form, etag } = await readFormDefinition(entry);
+            return structuredResult({ ...storage.toPageMeta(entry), form, etag, note: 'this page is a form: change it with update_form; its answers are rows of the paired table (form.table.id) — read them with folio_table_query' });
+          }
+          if (entry.kind === 'table') {
+            return structuredResult({ ...storage.toPageMeta(entry), note: 'this page is a data table — call folio_table_schema for its columns and views, folio_table_query for its rows' });
+          }
+          if (entry.kind === 'pdf' || entry.kind === 'office') {
+            // A pdf/office page's bytes aren't text — there is nothing to return
+            // as "content" here (see storage.ts's Binary page files module doc
+            // comment for why the bytes are never decoded). Metadata plus a
+            // clear note so the model doesn't mistake an empty body for an
+            // empty page.
+            const kindLabel = entry.kind === 'pdf' ? 'PDF' : 'office (docx/xlsx/pptx)';
+            return structuredResult({ ...storage.toPageMeta(entry), note: `this page is a ${kindLabel} file, not text content — its bytes are not exposed over MCP` });
+          }
+          const svg = await storage.readBoardSvg(id);
+          return structuredResult({ ...storage.toPageMeta(entry), svg });
         });
+      } catch (err) {
+        if (err instanceof DocumentEditError) return errorResult(JSON.stringify(err.toJSON()));
+        throw err;
       }
-      if (entry.kind === 'base') {
-        // A base is a query: its YAML here, its rows through query_base.
-        const { text } = await storage.readBaseRaw(id);
-        return structuredResult({ ...storage.toPageMeta(entry), markdown: text, note: 'this page is a base (Obsidian Bases YAML: filters, formulas, views) — call query_base for its rows' });
-      }
-      if (entry.kind === 'form') {
-        // A form's definition (settings and fields, each field a column of the paired table) and the etag update_form takes.
-        const { form, etag } = await readFormDefinition(entry);
-        return structuredResult({ ...storage.toPageMeta(entry), form, etag, note: 'this page is a form: change it with update_form; its answers are rows of the paired table (form.table.id) — read them with folio_table_query' });
-      }
-      if (entry.kind === 'table') {
-        return structuredResult({ ...storage.toPageMeta(entry), note: 'this page is a data table — call folio_table_schema for its columns and views, folio_table_query for its rows' });
-      }
-      if (entry.kind === 'pdf' || entry.kind === 'office') {
-        // A pdf/office page's bytes aren't text — there is nothing to return
-        // as "content" here (see storage.ts's Binary page files module doc
-        // comment for why the bytes are never decoded). Metadata plus a
-        // clear note so the model doesn't mistake an empty body for an
-        // empty page.
-        const kindLabel = entry.kind === 'pdf' ? 'PDF' : 'office (docx/xlsx/pptx)';
-        return structuredResult({ ...storage.toPageMeta(entry), note: `this page is a ${kindLabel} file, not text content — its bytes are not exposed over MCP` });
-      }
-      const svg = await storage.readBoardSvg(id);
-      return structuredResult({ ...storage.toPageMeta(entry), svg });
     },
   );
 
@@ -889,8 +908,11 @@ export function buildFolioMcpServer(actor: McpActor, options: { origin?: string 
       const { entry, error } = await checkPageRole(actor, id, 'viewer');
       if (error || !entry) return errorResult(error ?? 'page not found');
       let text: string;
+      let revision: string | undefined;
       if (entry.kind === 'doc') {
-        text = collab.isDocLive(id) ? (collab.getLiveText(id) ?? entry.body ?? '') : await storage.readFreshDocBody(id);
+        const body = await collab.readDocumentBody(id);
+        text = body.markdown;
+        revision = body.revision;
       } else if (entry.kind === 'table') {
         const result = await tableService.queryRows(id, { limit: FETCH_TABLE_ROW_LIMIT, ctx: { currentUser: actor.user.username ?? undefined } });
         text = `${rowsToMarkdown(result.columns, result.rows)}\n\n(${result.rows.length} of ${result.total} row(s) shown)`;
@@ -913,6 +935,7 @@ export function buildFolioMcpServer(actor: McpActor, options: { origin?: string 
         id: entry.id,
         title: entry.title,
         text,
+        ...(revision ? { revision } : {}),
         url: pageUrl(entry.space, entry.id),
         metadata: { space: entry.space, path: entry.relPath, kind: entry.kind, updatedAt: entry.updatedAt },
       });
@@ -1132,26 +1155,60 @@ export function buildFolioMcpServer(actor: McpActor, options: { origin?: string 
   );
 
   server.registerTool(
+    'replace_page_text',
+    {
+      outputSchema: outputSchemas.body_edit, annotations: WRITE_OVERWRITES, title: 'Replace one exact passage',
+      description: 'Replace an exact nonempty quotation wherever it occurs uniquely in the current document, preserving all other text even during typing elsewhere. This explicitly permits location-independent matching; use sufficient context and read_page first. Missing, changed, overlapping repeated or ambiguous quotation fails. The entire result must consume oldText (unless unchanged); true append uses strict update_page. No fuzzy fallback or automatic replay on transport/503 failure. Read back and reconsider. Confirms file/snapshot persistence, never publication. Requires write scope.',
+      inputSchema: { id: z.string().describe('Document page id'), oldText: z.string().min(1).max(DOCUMENT_BODY_MAX_BYTES).describe('Exact unique passage including enough context; LF only'), newText: z.string().max(DOCUMENT_BODY_MAX_BYTES).describe('Replacement passage; must consume oldText throughout resulting body, or equal it for a no-op'), expectedLocation: expectedPageLocationSchema.optional().describe('Optional exact {space,path} precondition; does not grant page access') },
+    },
+    async ({ id, oldText, newText, expectedLocation }) => {
+      if (!hasWriteScope) return errorResult('this action requires a token with write scope');
+      const { entry, error } = await checkPageRole(actor, id, 'editor');
+      if (error || !entry) return errorResult(error ?? 'page not found');
+      if (entry.kind !== 'doc') return errorResult('replace_page_text only supports documents');
+      try {
+        const result = await collab.replaceDocumentText(id, { oldText, newText, expectedLocation }, { name: actor.user.name, email: actor.user.email }, () => recheckPageEditor(actor, id));
+        if (result.changed) recordAudit(actor.user.id, 'page.updated', id, { source: 'mcp', tool: 'replace_page_text' });
+        return structuredResult(result);
+      } catch (err) {
+        if (err instanceof DocumentEditError) return errorResult(JSON.stringify(err.toJSON()));
+        if (err instanceof HttpError) return errorResult(err.message);
+        throw err;
+      }
+    },
+  );
+
+  server.registerTool(
     'update_page',
     {
-      outputSchema: outputSchemas.page,
+      outputSchema: outputSchemas.body_edit,
       annotations: WRITE_OVERWRITES,
       title: 'Update a page',
       description:
-        "Replaces a document page's body markdown. Routes through the same live-collaborative-doc-aware path the web editor's own save uses, so it merges safely with anyone editing the page at the same moment instead of overwriting their changes. Underline is written `++text++`, never `<ins>`/`<u>`. Does NOT support data tables — a table has no single body to replace; use folio_table_insert/folio_table_update/folio_table_add_column instead. Requires a write-scoped token.",
-      inputSchema: { id: z.string().describe('Page id'), markdown: z.string().describe('New body markdown') },
+        'Edits one document body through the shared Yjs room. First read_page; pass its revision as expectedRevision and exactly one of markdown (replacement) or edits (exact original UTF-16 ranges). Stale revisions and mismatched/overlapping ranges fail without changes; reread and reconcile. Body only, LF line endings, no frontmatter, up to 1 MiB and 100 edits. Success confirms file/snapshot persistence, not Git publication or indexing. On a transport/persistence failure read back before retrying. Underline is ++text++. Does not support data tables; use folio_table_insert/folio_table_update/folio_table_add_column. Requires write scope.',
+      inputSchema: {
+        id: z.string().describe('Document page id'),
+        expectedRevision: documentRevisionSchema.optional().describe('Required: revision from the exact body returned by read_page or fetch'),
+        expectedLocation: expectedPageLocationSchema.optional().describe('Optional exact {space,path} from page metadata; refuse if it moved'),
+        markdown: z.string().max(DOCUMENT_BODY_MAX_BYTES).optional().describe('Complete replacement body; mutually exclusive with edits. No frontmatter; LF only'),
+        edits: z.array(documentRangeEditSchema).min(1).max(100).optional().describe('Exact ranges in the original read body: {from,to,expectedText,text}; UTF-16 offsets, nonoverlapping, no duplicate insertion points'),
+      },
     },
-    async ({ id, markdown }) => {
+    async ({ id, markdown, edits, expectedRevision, expectedLocation }) => {
       if (!hasWriteScope) return errorResult('this action requires a token with write scope');
       const { entry, error } = await checkPageRole(actor, id, 'editor');
       if (error || !entry) return errorResult(error ?? 'page not found');
       if (entry.kind === 'table') return errorResult('update_page does not support data tables — use folio_table_insert/folio_table_update/folio_table_add_column instead');
       if (entry.kind !== 'doc') return errorResult('update_page only supports document pages, not boards');
-      gitSync.recordEditor(entry.space, { name: actor.user.name, email: actor.user.email });
-      const result = await collab.editDocBody(id, markdown);
-      gitSync.noteActivity(entry.space);
-      recordAudit(actor.user.id, 'page.updated', id, { source: 'mcp', tool: 'update_page' });
-      return structuredResult(result);
+      try {
+        const result = await collab.editDocumentBody(id, { markdown, edits, expectedRevision, expectedLocation }, { name: actor.user.name, email: actor.user.email }, () => recheckPageEditor(actor, id));
+        if (result.changed) recordAudit(actor.user.id, 'page.updated', id, { source: 'mcp', tool: 'update_page' });
+        return structuredResult(result);
+      } catch (err) {
+        if (err instanceof DocumentEditError) return errorResult(JSON.stringify(err.toJSON()));
+        if (err instanceof HttpError) return errorResult(err.message);
+        throw err;
+      }
     },
   );
 

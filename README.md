@@ -940,3 +940,21 @@ vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 ## License
 
 [MIT](LICENSE)
+
+
+## Fork maintenance
+
+This fork follows [evergreen-it-dev/folio](https://github.com/evergreen-it-dev/folio).
+`main` tracks upstream; `deployment` is the integration base for this fork.
+Pin a tested commit or image digest when deploying.
+
+The guarded document editing increment is described in
+[Shared agent editing](docs/AGENT-EDITING.md), with
+[verification and remaining integration work](docs/verification/guarded-agent-editing.md).
+It adds revision preconditions to external document writes and preserves the
+existing collaboration, permissions and publication boundaries. No live caller
+has migrated merely because this patch exists.
+
+Deployment now includes upstream's durable deletion and binary conflict recovery,
+including explicit per-file resolution. The earlier fork-only conflict patch has
+been retired in favor of that implementation; this feature preserves it.

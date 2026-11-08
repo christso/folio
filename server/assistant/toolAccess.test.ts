@@ -346,7 +346,7 @@ describe('assistant tools only return what the user may read (real PG, in-proces
         'add_comment', 'board_ops', 'check_page_writing_rules', 'convert_canvas_to_board', 'create_board', 'create_form', 'create_page', 'create_page_from_template', 'create_template', 'folio_table_add_column', 'folio_table_create', 'folio_table_delete',
         'folio_table_delete_column', 'folio_table_delete_view', 'folio_table_insert', 'folio_table_list', 'folio_table_query', 'folio_table_save_view', 'folio_table_schema',
         'folio_table_update', 'folio_table_update_column', 'get_backlinks', 'get_graph', 'get_page_metadata', 'list_comments', 'list_orphans', 'list_properties', 'list_spaces', 'list_tags',
-        'list_templates', 'list_tree', 'list_unresolved_links', 'page_at_sha', 'page_history', 'publish_artifact', 'query_base', 'read_page', 'read_skill', 'rename_tag', 'reply_comment', 'report_unanswered_question',
+        'list_templates', 'list_tree', 'list_unresolved_links', 'page_at_sha', 'page_history', 'publish_artifact', 'query_base', 'read_page', 'read_skill', 'rename_tag', 'replace_page_text', 'reply_comment', 'report_unanswered_question',
         'resolve_folio_url', 'save_base', 'save_page_as_template', 'search_pages', 'set_page_properties', 'update_board', 'update_form', 'update_page',
       ].sort(),
     );
@@ -440,6 +440,20 @@ describe('assistant tools only return what the user may read (real PG, in-proces
       expect(out.text).toContain('Unknown skill');
     }
     expect((await call(t, READ_SKILL_TOOL, {})).isError).toBe(true);
+  });
+
+  it('withholds an edit revision when a document exceeds the assistant response budget', async () => {
+    const page = await storage.createPage({ space: slugA, parentPath: '', title: 'Long document', kind: 'doc' }, { docBody: '# Long document\n\n' + 'x'.repeat(130_000) });
+    const handle = await tools(alice, 'agent');
+    const result = await call(handle, 'read_page', { id: page.id });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('complete assistant read');
+    expect(result.text).not.toContain('body-v1:');
+    expect(result.text.length).toBeLessThanOrEqual(120_000);
+    const write = await call(handle, 'update_page', { id: page.id, markdown: 'incomplete replacement' });
+    expect(write.isError).toBe(true);
+    expect(write.text).toContain('revision_required');
+    expect((await storage.readFreshDocBody(page.id)).length).toBeGreaterThan(130_000);
   });
 
   // -------------------------------------------------------------------------

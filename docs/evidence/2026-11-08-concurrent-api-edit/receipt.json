@@ -1,0 +1,58 @@
+{
+  "syntheticContentOnly": true,
+  "environment": {
+    "installation": "Docker Compose on a computer",
+    "browser": "Headless Chromium 151 on Linux x86_64",
+    "postgres": "17",
+    "redis": "7"
+  },
+  "upstream": {
+    "phase": "upstream",
+    "reproduced": true,
+    "nativeMcpReadAndWrite": true,
+    "browserKeyboardInput": true,
+    "browserAdditionConfirmedByServerBeforeWrite": true,
+    "mcpWriteIsError": false,
+    "initialBody": "# Concurrent editing example\n\nStatus: draft.\n\nOriginal paragraph stays.\n",
+    "bodyBeforeStaleWrite": "# Concurrent editing example\n\nStatus: draft.\n\nOriginal paragraph stays.\n\n\nBrowser addition: keep this sentence.",
+    "bodyAfterStaleWrite": "# Concurrent editing example\n\nStatus: reviewed.\n\nOriginal paragraph stays.\n",
+    "bodyAfterReload": "# Concurrent editing example\n\nStatus: reviewed.\n\nOriginal paragraph stays.\n",
+    "browserAdditionPreservedAfterReload": false,
+    "targetedUpdateSucceeded": false,
+    "browserErrors": "",
+    "fixtureOnly": true,
+    "newerBrowserSentenceAlsoAbsentFromCurrentFile": true,
+    "currentFileSha256": "6f864a41c03e6a1176b2ea65ec1fadc2a6fe4e1bea3f7bb61eb5ce75aa05f38f",
+    "unmodifiedBackendFilesEqualCurrentUpstream": [
+      "server/collab.ts",
+      "server/mcp.ts",
+      "server/routes.ts"
+    ],
+    "sourceBuild": "18b3b945af799d85d1115ce65cf4951faacc6086",
+    "currentUpstreamCompared": "2dd626383e6e2462a642a3d99e6c97d3aa3f9894"
+  },
+  "fixed": {
+    "phase": "fixed",
+    "reproduced": true,
+    "nativeMcpReadAndWrite": true,
+    "browserKeyboardInput": true,
+    "browserAdditionConfirmedByServerBeforeWrite": true,
+    "mcpWriteIsError": true,
+    "initialBody": "# Concurrent editing example\n\nStatus: draft.\n\nOriginal paragraph stays.\n",
+    "bodyBeforeStaleWrite": "# Concurrent editing example\n\nStatus: draft.\n\nOriginal paragraph stays.\n\n\nBrowser addition: keep this sentence.",
+    "bodyAfterStaleWrite": "# Concurrent editing example\n\nStatus: draft.\n\nOriginal paragraph stays.\n\n\nBrowser addition: keep this sentence.",
+    "bodyAfterReload": "# Concurrent editing example\n\nStatus: reviewed.\n\nOriginal paragraph stays.\n\n\nBrowser addition: keep this sentence.",
+    "browserAdditionPreservedAfterReload": true,
+    "targetedUpdateSucceeded": true,
+    "browserErrors": "",
+    "fixtureOnly": true,
+    "browserSentenceAlsoPreservedInCurrentFile": true,
+    "currentFileSha256": "373a76a7ddfaf37899d478aaf84e397b744d0a39eb877925beb941e49237b35f",
+    "sourceBuild": "a3b8222d0561c2f675680e5b4f92376d5800f767"
+  },
+  "captureNotes": {
+    "driver": "agent-browser",
+    "testStepStripIsHarnessAnnotation": true,
+    "mp4Playback": "8x slower than captured WebM for readability, with a final 2-second hold"
+  }
+}

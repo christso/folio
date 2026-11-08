@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import { useAuthOptional } from '../app/auth/AuthProvider';
+import { trackDocumentFileStatus, type DocumentFileTracker } from '../app/collabFileStatus';
 import { trackServerAck, type ServerAck } from '../app/collabAck';
 import { attachOfflineSession } from '../app/collabOffline';
 import { resolveAuthedIdentity, useOptionalSessionUser } from '../app/collabIdentity';
@@ -37,6 +38,7 @@ export interface CollabSession {
   undoManager: Y.UndoManager;
   /** Whether the server holds everything this tab has (app/collabAck.ts). */
   ack: ServerAck;
+  file: DocumentFileTracker;
   user: AnonUser;
   /**
    * The page was created offline and the server did not have it when this
@@ -162,10 +164,11 @@ export function useCollabSession(
     // Tracked origins are wired by y-codemirror.next's undo plugin.
     const undoManager = new Y.UndoManager(ytext, { captureTimeout: 400 });
     const ack = trackServerAck(provider, doc);
+    const file = trackDocumentFileStatus(provider, doc, pageId);
 
-    const offline = shared ? null : attachOfflineSession({ pageId, kind: 'doc', doc, provider, ack, getSpace: () => spaceRef.current });
+    const offline = shared ? null : attachOfflineSession({ pageId, kind: 'doc', doc, provider, ack, file, getSpace: () => spaceRef.current });
     let cancelled = false;
-    const open = () => setSession({ doc, ytext, provider, undoManager, ack, user, ...(offline?.startedLocal ? { startedLocal: true } : {}) });
+    const open = () => setSession({ doc, ytext, provider, undoManager, ack, file, user, ...(offline?.startedLocal ? { startedLocal: true } : {}) });
 
     // Leaving the page (closing the tab, reloading, navigating away from the
     // app) with edits the server has not confirmed: let the browser ask. The
@@ -177,7 +180,7 @@ export function useCollabSession(
     };
     doc.on('update', onLocalEdit);
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!editedHere || ack.isConfirmed()) return;
+      if ((!editedHere && file.getSnapshot().state !== 'error') || (ack.isConfirmed() && file.isConfirmed())) return;
       event.preventDefault();
       // Older browsers need a returnValue to show the prompt.
       event.returnValue = '';
@@ -199,6 +202,7 @@ export function useCollabSession(
       // Before the provider goes: it decides from the provider's state
       // whether the on-disk copy is still needed.
       offline?.dispose();
+      file.dispose();
       ack.dispose();
       undoManager.destroy();
       provider.destroy();
@@ -238,6 +242,7 @@ export function useConnectionStatus(session: CollabSession | null): ConnectionSt
     const apply = () => {
       if (timer) clearTimeout(timer);
       timer = undefined;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) { setStatus('offline'); return; }
       if (socket !== 'connected') {
         setStatus(socket === 'disconnected' ? 'offline' : 'connecting');
         return;
@@ -261,10 +266,12 @@ export function useConnectionStatus(session: CollabSession | null): ConnectionSt
     };
     provider.on('status', onStatus);
     const offAck = ack.subscribe(apply);
+    window.addEventListener('online', apply); window.addEventListener('offline', apply);
     return () => {
       if (timer) clearTimeout(timer);
       provider.off('status', onStatus);
       offAck();
+      window.removeEventListener('online', apply); window.removeEventListener('offline', apply);
     };
   }, [session]);
 
