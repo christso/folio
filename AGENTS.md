@@ -64,7 +64,11 @@ Breaking one of these is a bug, whatever the task was.
 
 ## Working rules
 
-1. **Branch from `main`**, do the work, merge. No direct edits on `main`.
+1. **Branch from `christso/main`** for this fork and merge through a pull
+   request into `christso/main`. It is the maintained default branch. `main`
+   mirrors `upstream/main` and receives only fast-forward upstream updates.
+   Integrate upstream changes into the maintained fork through a feature
+   branch, resolve conflicts and run the relevant checks before merging.
 2. **One agent per working tree.** Two agents in one checkout share one
    branch and one index, and one of them ends up committing onto the other's
    work. Parallel agents get a worktree each.
