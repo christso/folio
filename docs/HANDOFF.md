@@ -202,6 +202,14 @@ persistence from pending Git publication. Conflict and no-op calls do not
 claim attribution. Cookie body PUT and internal replacements remain legacy
 and unguarded. See [Shared agent editing](AGENT-EDITING.md).
 
+Scoped callers can supply an optional exact `{space,path}` location precondition
+on page reads and guarded body edits. It is checked while excluding structural
+mutations in this server process, including Redis's degraded path and cold room
+restoration. A moved page fails without content or actual-location disclosure.
+The caller still enforces its own access grant; the precondition grants none.
+REST and MCP body writes recheck page access after acquiring the live room,
+so queued requests cannot reuse permission removed while they were waiting.
+
 API-only rooms are reclaimed after inactivity; an API user holds a room until
 its operation finishes. Comment quote anchoring uses the same lease, preserving
 relative positions without an independent immediate room close. Seeding waits for a closing room's persistence, and

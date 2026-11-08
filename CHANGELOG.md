@@ -6,6 +6,11 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
 
 ### Added
 
+- Optional exact page-location preconditions on guarded document edits and
+  page reads. Callers can refuse a page that moved after they checked its
+  location. Same-process structural coordination remains active when Redis
+  is unavailable; these preconditions do not grant page access.
+
 - **Public sites are readable by AI agents.** Every published site now serves
   `llms.txt` (title, summary and a list of its pages grouped by section, each
   with a link to the page's Markdown and a one-line description taken from the

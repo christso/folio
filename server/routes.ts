@@ -70,6 +70,7 @@ import type {
 import * as storage from './storage.js';
 import * as collab from './collab.js';
 import { DocumentEditError } from './documentEdits.js';
+import { withPageLocation } from './pageLocation.js';
 import { decodeScenePayload, extractScenePayload } from './confluenceWhiteboard.js';
 import * as tables from './tables/service.js';
 import * as forms from './forms/service.js';
@@ -958,14 +959,26 @@ export function registerRoutes(app: FastifyInstance): void {
     const entry = await session.requirePageRole(request, id, 'editor');
     if (entry.kind !== 'doc') throw badRequest('replace-text only supports documents');
     const user = request.authUser!;
-    try { return await collab.replaceDocumentText(id, request.body, { name: user.name, email: user.email }); }
+    try { return await collab.replaceDocumentText(id, request.body, { name: user.name, email: user.email }, async () => { await session.requirePageRole(request, id, 'editor'); }); }
     catch (err) { if (err instanceof DocumentEditError) return reply.status(err.status).send(err.toJSON()); throw err; }
   });
 
-  app.get('/api/pages/:id', async (request) => {
+  app.get('/api/pages/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const { expectedSpace, expectedPath } = request.query as { expectedSpace?: string; expectedPath?: string };
+    const expected = expectedSpace === undefined && expectedPath === undefined ? undefined : { space: expectedSpace, path: expectedPath };
+    // Keep the normal denial before checking or disclosing a page location.
     const entry = await session.requirePageRole(request, id, 'viewer');
-    return buildPageDoc(entry, userViewer(request.authUser!));
+    if (expected === undefined) return buildPageDoc(entry, userViewer(request.authUser!));
+    try {
+      return await withPageLocation(id, expected, async () => {
+        const fresh = await session.requirePageRole(request, id, 'viewer');
+        return buildPageDoc(fresh, userViewer(request.authUser!));
+      });
+    } catch (err) {
+      if (err instanceof DocumentEditError) return reply.status(err.status).send(err.toJSON());
+      throw err;
+    }
   });
 
   /** Obsidian canvas: the parsed `.canvas` with its file cards resolved for this reader — the same object PageDoc.canvas carries (server/canvasView.ts). */
@@ -1151,11 +1164,11 @@ export function registerRoutes(app: FastifyInstance): void {
     session.requireWriteScope(request);
     const user = request.authUser!;
 
-    if (body.expectedRevision !== undefined || body.edits !== undefined || (entry.kind === 'doc' && body.markdown !== undefined && request.tokenScopes !== undefined)) {
+    if (body.expectedLocation !== undefined || body.expectedRevision !== undefined || body.edits !== undefined || (entry.kind === 'doc' && body.markdown !== undefined && request.tokenScopes !== undefined)) {
       if (entry.kind !== 'doc') throw badRequest('guarded body edits only support document pages');
       try {
         // Pass the original object: guarded bodies reject metadata/unknown fields.
-        return await collab.editDocumentBody(id, request.body, { name: user.name, email: user.email });
+        return await collab.editDocumentBody(id, request.body, { name: user.name, email: user.email }, async () => { await session.requirePageRole(request, id, 'editor'); });
       } catch (err) {
         if (err instanceof DocumentEditError) return reply.status(err.status).send(err.toJSON());
         throw err;

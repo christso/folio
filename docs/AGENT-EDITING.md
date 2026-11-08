@@ -75,10 +75,34 @@ The existing page metadata `status: "published"` describes its workflow state, n
 
 Success confirms a Markdown or MDX file write/check and collaborative snapshot persistence. MDX imports, components and expressions outside the edited range are opaque body text and stay intact. A no-op reports `changed: false` and does not claim authorship or start a new commit. The connected user's existing identity is recorded for accepted changes; commits retain Folio's last-editor-per-space behavior and may include other pending edits. There is no per-request Git commit or new audit-receipt store.
 
+## Location preconditions
+
+Scoped clients can add `expectedLocation: {space, path}` to a guarded body edit
+or exact-passage replacement, using the exact page metadata from their read.
+`read_page` accepts the same optional field. REST reads accept both
+`expectedSpace` and `expectedPath` query parameters, for example
+`GET /api/pages/<id>?expectedSpace=notes&expectedPath=team%2Fpage.md`.
+Providing just one parameter is invalid.
+
+Folio checks location under the same process-local fence used by structural
+operations, then keeps it through cold document restoration and the read/edit.
+A move or rename that finishes first makes the request fail with
+409 `location_conflict`, without current content or location in the error.
+Normal browser text collaboration continues through Yjs. Redis loss, advisory
+lock timeout or lease expiry does not disable the local fence. This is Folio's
+single-server-process coordination, not a replicated Yjs or cross-process lock.
+
+This precondition narrows an operation; it does not authorize one. A gateway
+still authenticates its caller, enforces that caller's allowed destinations,
+and supplies the checked location itself. A page ID or caller-provided location
+must not become an access grant. Direct filesystem changes by administrators
+remain outside the API's coordination contract.
+
 | REST status / code | Meaning and action |
 |---|---|
 | 428 `revision_required` | Legacy bot write lacks a guard. Read and pass `expectedRevision`. |
 | 409 `revision_conflict` | The body changed. Returns `currentRevision`, without current content. Read, reconcile and prepare a new edit. |
+| 409 `location_conflict` | The page is no longer at its expected space/path. Resolve it within the authorized scope and reconsider; no body or actual location is returned. |
 | 409 `range_conflict` | A range overlaps, splits a character, is invalid, or mismatches `expectedText`. Returns a bounded `editIndex` and `currentRevision`. Fix the edit after reading. |
 | 400 `invalid_body_edit`, `invalid_body_text`, `frontmatter_not_allowed` | Invalid shape or body. No mutation. Schema-level validation can also return 400 before the guarded handler. |
 | 413 `body_edit_too_large` | Input or resulting body exceeds the limit. Schema-level character/count limits may return 400; HTTP size limits may return 413. |
