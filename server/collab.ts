@@ -53,6 +53,7 @@ import { documentHistoryHash } from './documentPersistence.js';
 import { DOCUMENT_FILE_STATUS_MESSAGE, DOCUMENT_FILE_REQUEST_MESSAGE, type DocumentFileStatus } from '../shared/contracts.js';
 import { bodyRevision, DocumentEditError, planBodyEdit, planTextReplacement } from './documentEdits.js';
 import type { DocumentBodyEditResult } from '../shared/contracts.js';
+import { withPageLocation } from './pageLocation.js';
 
 interface PersistenceHooks {
   bindState: (docName: string, doc: Y.Doc) => Promise<void> | void;
@@ -2714,19 +2715,23 @@ export async function readDocumentBody(id: string): Promise<{ markdown: string; 
   });
 }
 
-/** Authorization is the caller's responsibility. No await separates guards and mutation. */
-export async function editDocumentBody(id: string, input: unknown, author: GitIdentity): Promise<DocumentBodyEditResult> {
-  return withDocumentRoom(id, (doc, entry) => {
+/** API callers recheck authorization after room acquisition. No await separates planning and mutation. */
+export async function editDocumentBody(id: string, input: unknown, author: GitIdentity, authorize?: () => Promise<void>): Promise<DocumentBodyEditResult> {
+  const expectedLocation = input && typeof input === 'object' && 'expectedLocation' in input ? input.expectedLocation : undefined;
+  return withPageLocation(id, expectedLocation, () => withDocumentRoom(id, async (doc, entry) => {
+    await authorize?.();
     const plan = planBodyEdit(id, doc.getText('content').toString(), input);
     return persistPlannedBodyEdit(id, doc, entry, plan, author, typeof input === 'object' && input !== null && 'markdown' in input && input.markdown !== undefined);
-  });
+  }));
 }
 
-export async function replaceDocumentText(id: string, input: unknown, author: GitIdentity): Promise<DocumentBodyEditResult> {
-  return withDocumentRoom(id, (doc, entry) => {
+export async function replaceDocumentText(id: string, input: unknown, author: GitIdentity, authorize?: () => Promise<void>): Promise<DocumentBodyEditResult> {
+  const expectedLocation = input && typeof input === 'object' && 'expectedLocation' in input ? input.expectedLocation : undefined;
+  return withPageLocation(id, expectedLocation, () => withDocumentRoom(id, async (doc, entry) => {
+    await authorize?.();
     const plan = planTextReplacement(id, doc.getText('content').toString(), input);
     return persistPlannedBodyEdit(id, doc, entry, plan, author);
-  });
+  }));
 }
 
 /** Called synchronously after planning on the same leased room. */

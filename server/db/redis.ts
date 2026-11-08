@@ -3,13 +3,14 @@
  * advisory locks (later: realtime presence/state). Never a system of record
  * (DEV-PLAN: "core data does not live in Redis"). Every function here degrades
  * gracefully when Redis is unreachable — a warning is logged once, and
- * callers fall back to an in-memory/unlocked path — rather than throwing,
+ * callers fall back to in-memory coordination — rather than throwing,
  * per DEV-PLAN's explicit "Redis unavailable -> degrade with a warning, do
  * not fail".
  */
 import { randomBytes } from 'node:crypto';
 import Redis from 'ioredis';
 import { loadEnv } from '../env.js';
+import { withSpaceFence } from './spaceFence.js';
 
 let client: Redis | undefined;
 let warnedUnavailable = false;
@@ -29,7 +30,7 @@ export function getRedis(): Redis {
       if (!warnedUnavailable) {
         warnedUnavailable = true;
         // eslint-disable-next-line no-console
-        console.warn(`[redis] unavailable, degrading (in-memory rate limit, unlocked space mutations): ${err.message}`);
+        console.warn(`[redis] unavailable, degrading (in-memory rate limit and space coordination): ${err.message}`);
       }
     });
     client.on('ready', () => {
@@ -96,18 +97,21 @@ const RELEASE_SCRIPT = `if redis.call("get", KEYS[1]) == ARGV[1] then return red
 
 export interface SpaceLockOptions {
   ttlMs?: number;
-  /** Max time to wait for the lock before giving up and running fn unlocked. */
+  /** Max time to wait for the Redis advisory lock before using local exclusion only. */
   waitMs?: number;
 }
 
 /**
- * Runs `fn` while holding an advisory lock on `space`. If Redis is down, or
- * the lock can't be acquired within `waitMs`, runs `fn` unlocked rather than
- * failing the request — this is a consistency nicety on top of an
- * already-safe (if occasionally racy across processes) file-based storage
- * layer, not a hard correctness dependency.
+ * Always excludes other same-process structural operations on this space.
+ * Redis additionally supplies a best-effort advisory lock across processes.
+ * Redis loss, timeout or lease expiry never bypasses the local fence. Folio's
+ * live collaboration model remains one server process, not replicated Yjs.
  */
 export async function withSpaceLock<T>(space: string, fn: () => Promise<T>, options: SpaceLockOptions = {}): Promise<T> {
+  return withSpaceFence(space, () => withAdvisorySpaceLock(space, fn, options));
+}
+
+async function withAdvisorySpaceLock<T>(space: string, fn: () => Promise<T>, options: SpaceLockOptions): Promise<T> {
   const ttlMs = options.ttlMs ?? 10_000;
   const waitMs = options.waitMs ?? 5_000;
 
@@ -132,7 +136,7 @@ export async function withSpaceLock<T>(space: string, fn: () => Promise<T>, opti
     return fn(); // Redis went away mid-wait — degrade rather than fail the request
   }
 
-  if (!acquired) return fn(); // lock held by someone else past the deadline — proceed unlocked
+  if (!acquired) return fn(); // advisory timeout; the caller still holds the local fence
 
   try {
     return await fn();

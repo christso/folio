@@ -283,4 +283,12 @@ index is rebuilt from the files automatically.
 
 `replace_page_text(id, oldText, newText)` is the additive document passage tool; REST offers `POST /api/pages/:id/replace-text` with `oldText` and `newText`. It replaces one exact, nonempty, unique quotation in the current body, permitting unrelated typing. The resulting body must consume the source quotation on changes; missing/ambiguous/recreated quotations fail without mutation. This is explicit location-independent intent, with the same body limits, access, attribution and file/publication results as guarded updates. Strict `update_page` revisions remain required.
 
+`read_page`, `update_page` and `replace_page_text` additionally accept optional
+`expectedLocation: {space, path}` from exact page metadata. A concurrent move or
+rename produces `location_conflict` without content or actual-location disclosure.
+REST GET uses `expectedSpace` and `expectedPath` together; guarded PUT and
+replace-text use the same `expectedLocation` body field. This precondition is
+coordinated with structural operations in Folio's server process, including
+Redis's degraded path. It does not replace authorization or client scope checks.
+
 The built-in assistant returns complete authorized conflict context and enforces a shared two-conflict page/run budget. Unknown outcomes block writes until an explicit complete read, and two uncertain write outcomes stop further body writes for that page/run even if reads interleave. Incomplete reads supply no revision. External clients must implement equivalent bounded recovery themselves. See [Shared agent editing](AGENT-EDITING.md) for the precise matching, retry and publication contract.

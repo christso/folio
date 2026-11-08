@@ -15,6 +15,7 @@ import * as session from './auth/session.js';
 import * as gitSync from './gitSync.js';
 import { setUpTestSchema, deleteTestSpace } from './db/testSchema.js';
 import { query } from './db/pool.js';
+import { withSpaceLock } from './db/redis.js';
 import { registerRoutes } from './routes.js';
 import { buildFolioMcpServer } from './mcp.js';
 import { HttpError } from './errors.js';
@@ -82,6 +83,113 @@ async function read(id: string) { return (await app.inject({ method: 'GET', url:
 async function call(args: Record<string, unknown>) { return client.callTool({ name: 'update_page', arguments: args }); }
 
 describe('guarded editing through actual storage, REST and MCP', () => {
+  it.each(['REST body', 'REST quotation', 'MCP body', 'MCP quotation'])('rechecks access after a queued %s edit acquires its room', async (variant) => {
+    const p = await page();
+    const before = await read(p.id);
+    const member = await auth.createUser({ email: `${variant.replaceAll(' ', '-')}@example.com`, name: 'Member', passwordHash: 'x', isAdmin: false });
+    await auth.setMembership(space, member.id, 'editor');
+    const token = (await auth.createApiToken(member.id, 'queued', ['write'])).token;
+    const server = buildFolioMcpServer({ user: member, scopes: ['write'], tokenId: 'queued-synthetic-token' });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    const peer = new Client({ name: 'queued-edit-test', version: '1' });
+    await Promise.all([peer.connect(ct), server.connect(st)]);
+    let release!: () => void;
+    let acquired!: () => void;
+    const held = new Promise<void>((resolve) => (acquired = resolve));
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const fence = withSpaceLock(space, async () => { acquired(); await gate; });
+    await held;
+    let checked = false;
+    const original = pageAccess.effectivePageRole;
+    const roleCheck = vi.spyOn(pageAccess, 'effectivePageRole').mockImplementation(async (...args) => {
+      const role = await original(...args);
+      if (args[0].id === member.id && args[1].id === p.id) checked = true;
+      return role;
+    });
+    const expectedLocation = { space, path: p.path };
+    const payload = variant.endsWith('body')
+      ? { expectedLocation, expectedRevision: before.revision, markdown: 'must not be written' }
+      : { expectedLocation, oldText: 'beta', newText: 'must not be written' };
+    const pending = variant.startsWith('MCP')
+      ? peer.callTool({ name: variant.endsWith('body') ? 'update_page' : 'replace_page_text', arguments: { id: p.id, ...payload } })
+      : app.inject({ method: variant.endsWith('body') ? 'PUT' : 'POST', url: `/api/pages/${p.id}${variant.endsWith('body') ? '' : '/replace-text'}`, headers: { authorization: `Bearer ${token}` }, payload }).then((response) => response);
+    try {
+      await vi.waitFor(() => expect(checked).toBe(true));
+      await pageAccess.setAccess(user, await storage.requireEntry(p.id), 'restricted', []);
+      release();
+      const response = await pending;
+      if ('statusCode' in response) expect(response.statusCode).toBe(403);
+      else expect(response.isError).toBe(true);
+      expect((await read(p.id)).markdown).toBe(before.markdown);
+      expect(await storage.readFreshDocBody(p.id)).toBe(before.markdown);
+    } finally {
+      release();
+      await Promise.allSettled([fence, pending]);
+      roleCheck.mockRestore();
+      await peer.close();
+    }
+  });
+
+  it('rejects a read for a different expected location without returning document content', async () => {
+    const p = await page('# Scoped document\n\nPrivate passage.\n');
+    const response = await app.inject({ method: 'GET',
+      url: `/api/pages/${p.id}?expectedSpace=${space}&expectedPath=another%2Fpage.md`, headers: headers() });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ code: 'location_conflict' });
+    expect(response.body).not.toContain('Private passage');
+    expect(response.body).not.toContain(p.path);
+  });
+
+  it('keeps REST and MCP edits at their expected location, including after a real move', async () => {
+    const p = await page();
+    const before = await read(p.id);
+    const expectedLocation = { space, path: p.path };
+    const matched = await app.inject({ method: 'GET',
+      url: `/api/pages/${p.id}?expectedSpace=${space}&expectedPath=${encodeURIComponent(p.path)}`, headers: headers() });
+    expect(matched.statusCode).toBe(200);
+    expect(matched.json().revision).toBe(before.revision);
+    const initial = await app.inject({ method: 'PUT', url: `/api/pages/${p.id}`, headers: headers(),
+      payload: { expectedLocation, expectedRevision: before.revision, markdown: before.markdown } });
+    expect(initial.statusCode).toBe(200);
+
+    const moved = await storage.movePage(p.id, 'outside');
+    const stale = { id: p.id, expectedLocation, expectedRevision: before.revision, markdown: 'must not be written' };
+    const rest = await app.inject({ method: 'PUT', url: `/api/pages/${p.id}`, headers: headers(), payload: stale });
+    expect(rest.statusCode).toBe(409);
+    expect(rest.json().code).toBe('location_conflict');
+    const strict = await call(stale);
+    expect(strict.isError).toBe(true);
+    expect(JSON.stringify(strict)).toContain('location_conflict');
+    const quote = await client.callTool({ name: 'replace_page_text', arguments: {
+      id: p.id, expectedLocation, oldText: 'beta', newText: 'reviewed',
+    } });
+    expect(quote.isError).toBe(true);
+    expect(JSON.stringify(quote)).toContain('location_conflict');
+    const guardedRead = await client.callTool({ name: 'read_page', arguments: { id: p.id, expectedLocation } });
+    expect(guardedRead.isError).toBe(true);
+    expect(JSON.stringify(guardedRead)).not.toContain('alpha beta gamma');
+    expect((await read(p.id)).markdown).toBe(before.markdown);
+
+    const accepted = await client.callTool({ name: 'replace_page_text', arguments: {
+      id: p.id, expectedLocation: { space, path: moved.path }, oldText: 'beta', newText: 'reviewed',
+    } });
+    expect(accepted.isError).not.toBe(true);
+    expect((await read(p.id)).markdown).toBe(before.markdown.replace('beta', 'reviewed'));
+  });
+
+  it('rejects incomplete read preconditions and guards unique-passage REST edits after a rename', async () => {
+    const p = await page();
+    const incomplete = await app.inject({ method: 'GET', url: `/api/pages/${p.id}?expectedSpace=${space}`, headers: headers() });
+    expect(incomplete.statusCode).toBe(400);
+    await storage.renamePageSlug(p.id, 'renamed-scope-page');
+    const refused = await app.inject({ method: 'POST', url: `/api/pages/${p.id}/replace-text`, headers: headers(), payload: {
+      expectedLocation: { space, path: p.path }, oldText: 'beta', newText: 'unapproved location',
+    } });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().code).toBe('location_conflict');
+    expect((await read(p.id)).markdown).toContain('alpha beta gamma');
+  });
+
   it('allows one of two competing bots and persists body and snapshot with unrelated text intact', async () => {
     const p = await page();
     const before = await read(p.id);

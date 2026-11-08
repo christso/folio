@@ -1293,9 +1293,16 @@ export const documentFileStatusSchema = z.object({
   history: z.string().nullable(),
 }).strict();
 export type DocumentFileStatus = z.infer<typeof documentFileStatusSchema>;
+/** Optional exact location precondition; it does not grant access to a page. */
+export const expectedPageLocationSchema = z.object({
+  space: z.string().min(1).max(128),
+  path: z.string().min(1).max(4096),
+}).strict();
+export type ExpectedPageLocation = z.infer<typeof expectedPageLocationSchema>;
 export const documentTextReplacementSchema = z.object({
   oldText: z.string().min(1).max(DOCUMENT_BODY_MAX_BYTES),
   newText: z.string().max(DOCUMENT_BODY_MAX_BYTES),
+  expectedLocation: expectedPageLocationSchema.optional(),
 }).strict();
 
 /** Document body offsets are UTF-16 code units in the LF-normalized read body. */
@@ -1310,6 +1317,7 @@ export const documentBodyEditSchema = z.object({
   expectedRevision: documentRevisionSchema,
   markdown: z.string().max(DOCUMENT_BODY_MAX_BYTES).optional(),
   edits: z.array(documentRangeEditSchema).min(1).max(100).optional(),
+  expectedLocation: expectedPageLocationSchema.optional(),
 }).strict().refine((body) => (body.markdown !== undefined) !== (body.edits !== undefined), 'provide exactly one of markdown or edits');
 export type DocumentBodyEdit = z.infer<typeof documentBodyEditSchema>;
 export interface DocumentBodyEditResult extends PageMeta {
@@ -1322,6 +1330,7 @@ export interface DocumentBodyEditResult extends PageMeta {
 export const updatePageBodySchema = z.object({
   markdown: z.string().optional(),
   expectedRevision: documentRevisionSchema.optional(),
+  expectedLocation: expectedPageLocationSchema.optional(),
   edits: z.array(documentRangeEditSchema).min(1).max(100).optional(),
   svg: z.string().optional(),
   /** Round 22: the position among siblings (frontmatter `order`) — a body with
