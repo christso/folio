@@ -49,6 +49,8 @@ import { decodeScenePayload, extractScenePayload, renderSceneSvg } from './confl
 import { orderBoardElements, placeBoundTexts, withBoardIndexes } from './boardOrder.js';
 import type { ExcalidrawElement, ExcalidrawScene } from './confluenceWhiteboard.js';
 import { trackConnection } from './liveConnections.js';
+import { documentHistoryHash } from './documentPersistence.js';
+import { DOCUMENT_FILE_STATUS_MESSAGE, DOCUMENT_FILE_REQUEST_MESSAGE, type DocumentFileStatus } from '../shared/contracts.js';
 import { bodyRevision, DocumentEditError, planBodyEdit } from './documentEdits.js';
 import type { DocumentBodyEditResult } from '../shared/contracts.js';
 
@@ -211,6 +213,22 @@ export function createDebouncedWriter(fn: () => void | Promise<void>, ms: number
   };
 }
 
+const documentFileSubscribers = new WeakMap<Y.Doc, Set<WS.WebSocket>>();
+const documentFileStatuses = new WeakMap<Y.Doc, DocumentFileStatus>();
+function sendDocumentFileStatus(conn: { readyState: number; send(data: Uint8Array): void }, doc: Y.Doc): void {
+  const status = documentFileStatuses.get(doc);
+  if (!status || conn.readyState !== 1) return;
+  const frame = encoding.createEncoder();
+  encoding.writeVarUint(frame, DOCUMENT_FILE_STATUS_MESSAGE);
+  encoding.writeVarString(frame, JSON.stringify(status));
+  try { conn.send(encoding.toUint8Array(frame)); } catch { /* a closing socket cannot affect persistence */ }
+}
+function setDocumentFileStatus(id: string, doc: Y.Doc, status: DocumentFileStatus): void {
+  documentFileStatuses.set(doc, status);
+  if (docs.get(id) !== doc) return;
+  for (const conn of documentFileSubscribers.get(doc) ?? []) sendDocumentFileStatus(conn, doc);
+}
+
 const writers = new Map<string, DebouncedWriter>();
 
 /**
@@ -369,6 +387,7 @@ export async function persistDoc(docName: string, ydoc: Y.Doc): Promise<boolean>
   if (current.kind !== 'doc') return true;
   try {
     const newBody = ydoc.getText('content').toString();
+    const capturedSnapshot = yEngineFor(ydoc).encodeStateAsUpdate(ydoc);
     if (!isDocSeeded(docName)) {
       // Line endings aside: a room never holds "\r", the file of a CRLF (or mixed) page keeps them.
       const onDisk = normalizeEol(await storage.readFreshDocBody(docName).catch(() => ''));
@@ -413,7 +432,8 @@ export async function persistDoc(docName: string, ydoc: Y.Doc): Promise<boolean>
     // Once the file changed it needs a commit even if snapshot persistence
     // fails. A retry sees identical file bytes and cannot rediscover this write.
     if (written) gitSync.noteActivity(current.space);
-    await storeSnapshot(docName, ydoc, storage.docFileBody(newBody)); // same cadence as the file write
+    await upsertSnapshotRow(docName, capturedSnapshot, fileBodyHash(storage.docFileBody(newBody)));
+    setDocumentFileStatus(docName, ydoc, { version: 1, state: 'saved', revision: bodyRevision(docName, newBody), history: documentHistoryHash(capturedSnapshot) });
     if (!written) return true;
     // Title edited in the H1 (the usual way a new page gets its name): follow
     // with the slug while it is still the auto-derived one — see maybeAutoRenameSlug.
@@ -2350,6 +2370,9 @@ export async function bindState(docName: string, ydoc: Y.Doc): Promise<void> {
     retryTimer = undefined;
     const ok = await persistDoc(docName, ydoc);
     persistSucceeded.set(ydoc, ok);
+    if (!ok && documentFileStatuses.has(ydoc)) {
+      setDocumentFileStatus(docName, ydoc, { ...documentFileStatuses.get(ydoc)!, state: 'error' });
+    }
     if (ok) {
       failures = 0;
       return;
@@ -2370,7 +2393,12 @@ export async function bindState(docName: string, ydoc: Y.Doc): Promise<void> {
     retryTimer.unref?.();
   }, WRITE_DEBOUNCE_MS);
   writers.set(docName, writer);
-  ydoc.on('update', () => writer.schedule());
+  if (entry?.kind === 'doc') documentFileStatuses.set(ydoc, { version: 1, state: 'saving', revision: null, history: null });
+  ydoc.on('update', () => {
+    const status = documentFileStatuses.get(ydoc);
+    if (status) setDocumentFileStatus(docName, ydoc, { ...status, state: status.state === 'error' ? 'error' : 'saving' });
+    writer.schedule();
+  });
   if (snapshotAheadOfFile) writer.schedule();
 }
 
@@ -3114,6 +3142,11 @@ function isReadOnlySafeFrame(raw: ArrayBuffer | Uint8Array): boolean {
     const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
     const decoder = decoding.createDecoder(bytes);
     const topType = decoding.readVarUint(decoder);
+    if (topType === DOCUMENT_FILE_REQUEST_MESSAGE) {
+      if (bytes.byteLength > 256) return false;
+      const request = JSON.parse(decoding.readVarString(decoder));
+      return request.version === 1 && request.action === 'status';
+    }
     if (topType === MESSAGE_AWARENESS) return true;
     if (topType === MESSAGE_SYNC) return decoding.readVarUint(decoder) === SYNC_STEP_1;
     return false; // unknown top-level type: fail closed
@@ -3195,7 +3228,7 @@ function makeSilentViewer(conn: unknown): void {
     if (event !== 'message') return originalOn(event, listener);
     return originalOn('message', (data: unknown) => {
       const raw = data as ArrayBuffer | Uint8Array;
-      if (frameTopType(raw) === MESSAGE_SYNC && isReadOnlySafeFrame(raw)) listener(data);
+      if ([MESSAGE_SYNC, DOCUMENT_FILE_REQUEST_MESSAGE].includes(frameTopType(raw) ?? -1) && isReadOnlySafeFrame(raw)) listener(data);
     });
   }) as MinimalEmitter['on'];
   const originalSend = emitter.send.bind(emitter);
@@ -3377,10 +3410,28 @@ export function attachToServer(httpServer: HttpServer): void {
         if (publicVisitor) makeSilentViewer(conn);
         else if (role === 'viewer') makeReadOnly(conn);
         setupWSConnection(conn, req, { docName });
+        const room = docs.get(docName);
+        if (room && entry.kind === 'doc') writers.get(docName)?.schedule();
+        let lastFileRequest = -Infinity;
         // After setupWSConnection, so our listener runs alongside its own.
         (conn as MinimalEmitter).on('message', (...args: unknown[]) => {
           const raw = args[0] as ArrayBuffer | Uint8Array;
           if (isSyncStep1Frame(raw)) replyWithOwnStateVector(conn, docName);
+          if (!room || entry.kind !== 'doc' || raw.byteLength > 256) return;
+          try {
+            const decoder = decoding.createDecoder(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
+            if (decoding.readVarUint(decoder) !== DOCUMENT_FILE_REQUEST_MESSAGE) return;
+            const request = JSON.parse(decoding.readVarString(decoder));
+            if (request.version !== 1 || !['status', 'retry'].includes(request.action)) return;
+            if (!documentFileSubscribers.has(room)) documentFileSubscribers.set(room, new Set());
+            const subscribers = documentFileSubscribers.get(room)!;
+            if (!subscribers.has(conn)) { subscribers.add(conn); conn.once('close', () => subscribers.delete(conn)); }
+            if (request.action === 'retry' && session.roleAtLeast(role, 'editor') && Date.now() - lastFileRequest >= 1000) {
+              lastFileRequest = Date.now();
+              writers.get(docName)?.schedule();
+            }
+            sendDocumentFileStatus(conn, room);
+          } catch { /* invalid control frames never mutate the document */ }
         });
       });
     })();

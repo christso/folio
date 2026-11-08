@@ -293,10 +293,22 @@
       "name": "Table",
       "description": "A grid you edit right on the page"
     },
-    "columns2": { "name": "2 columns", "description": "Borderless two-column page layout" },
-    "columns3": { "name": "3 columns", "description": "Borderless three-column page layout" },
-    "columns4": { "name": "4 columns", "description": "Borderless four-column page layout" },
-    "columns5": { "name": "5 columns", "description": "Borderless five-column page layout" },
+    "columns2": {
+      "name": "2 columns",
+      "description": "Borderless two-column page layout"
+    },
+    "columns3": {
+      "name": "3 columns",
+      "description": "Borderless three-column page layout"
+    },
+    "columns4": {
+      "name": "4 columns",
+      "description": "Borderless four-column page layout"
+    },
+    "columns5": {
+      "name": "5 columns",
+      "description": "Borderless five-column page layout"
+    },
     "code": {
       "name": "Code block",
       "description": "Monospaced block with highlighting"
@@ -382,5 +394,22 @@
       "red": "Red",
       "purple": "Purple"
     }
+  },
+  "fileSave": {
+    "saving": "Saving to file…",
+    "savingHint": "File and collaborative snapshot confirmation is pending. Connection and server receipt are separate.",
+    "saved": "File saved",
+    "savedHint": "This document state was saved to its file and collaborative snapshot. Git publication is separate.",
+    "error": "File save failed",
+    "errorHint": "File or snapshot persistence failed. Keep this tab open or export a copy. Your text has not been replaced; the server will retry.",
+    "offline": "Offline — file save unconfirmed",
+    "offlineHint": "Edits stay on this device until connection and file persistence are confirmed.",
+    "unreceived": "Waiting for server receipt",
+    "unreceivedHint": "The server has not confirmed receiving your latest changes.",
+    "unconfirmed": "File save unconfirmed",
+    "unconfirmedHint": "No current file/snapshot confirmation is available. Keep this tab open or export a copy.",
+    "retry": "Retry file save",
+    "publication": "Git publication not confirmed",
+    "received": "Received by server"
   }
 }

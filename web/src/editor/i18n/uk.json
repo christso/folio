@@ -293,10 +293,22 @@
       "name": "Таблиця",
       "description": "Сітка з редагуванням клітинок просто на сторінці"
     },
-    "columns2": { "name": "2 колонки", "description": "Дві колонки без рамок" },
-    "columns3": { "name": "3 колонки", "description": "Три колонки без рамок" },
-    "columns4": { "name": "4 колонки", "description": "Чотири колонки без рамок" },
-    "columns5": { "name": "5 колонок", "description": "П’ять колонок без рамок" },
+    "columns2": {
+      "name": "2 колонки",
+      "description": "Дві колонки без рамок"
+    },
+    "columns3": {
+      "name": "3 колонки",
+      "description": "Три колонки без рамок"
+    },
+    "columns4": {
+      "name": "4 колонки",
+      "description": "Чотири колонки без рамок"
+    },
+    "columns5": {
+      "name": "5 колонок",
+      "description": "П’ять колонок без рамок"
+    },
     "code": {
       "name": "Блок коду",
       "description": "Моноширинний блок з підсвічуванням"
@@ -382,5 +394,22 @@
       "red": "Червоний",
       "purple": "Фіолетовий"
     }
+  },
+  "fileSave": {
+    "saving": "Збереження у файл…",
+    "savingHint": "Очікується підтвердження файлу та спільного знімка. З’єднання й отримання сервером є окремими станами.",
+    "saved": "Файл збережено",
+    "savedHint": "This document state was saved to its file and collaborative snapshot. Git publication is separate.",
+    "error": "Помилка збереження файлу",
+    "errorHint": "File or snapshot persistence failed. Keep this tab open or export a copy. Your text has not been replaced; the server will retry.",
+    "offline": "Офлайн — збереження не підтверджено",
+    "offlineHint": "Edits stay on this device until connection and file persistence are confirmed.",
+    "unreceived": "Очікування підтвердження сервера",
+    "unreceivedHint": "The server has not confirmed receiving your latest changes.",
+    "unconfirmed": "Збереження файлу не підтверджено",
+    "unconfirmedHint": "No current file/snapshot confirmation is available. Keep this tab open or export a copy.",
+    "retry": "Повторити збереження",
+    "publication": "Публікацію в Git не підтверджено",
+    "received": "Отримано сервером"
   }
 }

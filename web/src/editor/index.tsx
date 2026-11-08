@@ -306,6 +306,7 @@ export function PageEditor({
         )}
         {comments.button}
         <ConnectionBadge status={status} peers={peers} />
+        <FileSaveBadge session={session} connection={status} readOnly={readOnly} />
         {readOnly ? (
           <span className="folio-editor__readonly">{t('readonly')}</span>
         ) : (
@@ -596,6 +597,22 @@ function PanelToggle() {
       </svg>
     </button>
   );
+}
+
+const UNCONFIRMED_FILE = { state: 'unconfirmed' as const };
+const noFileSubscription = () => () => {};
+function FileSaveBadge({ session, connection, readOnly }: { session: CollabSession | null; connection: ConnectionStatus; readOnly?: boolean }) {
+  const { t } = useTranslation(NS);
+  const file = session?.file;
+  const snapshot = useSyncExternalStore(file?.subscribe ?? noFileSubscription, file?.getSnapshot ?? (() => UNCONFIRMED_FILE));
+  const received = useSyncExternalStore(session?.ack?.subscribe ?? noFileSubscription, session?.ack?.isConfirmed ?? (() => false));
+  const state = snapshot.state === 'error' ? 'error' : connection === 'offline' ? 'offline' : connection === 'connecting' ? 'unconfirmed' : !received ? 'unreceived' : snapshot.state === 'saved' ? 'saved' : 'saving';
+  return <span className="folio-editor__file-save" data-file-state={state} role="status" aria-live="polite">
+    <span title={t(`fileSave.${state}Hint`)}>{t(`fileSave.${state}`)}</span>
+    {connection === 'connected' && received ? <small>{t('fileSave.received')}</small> : null}
+    <small>{t('fileSave.publication')}</small>
+    {state === 'error' && !readOnly ? <button type="button" onClick={() => file?.retry()}>{t('fileSave.retry')}</button> : null}
+  </span>;
 }
 
 /**

@@ -1282,6 +1282,21 @@ export const createPageBodySchema = z.object({
 });
 export type CreatePageBody = z.infer<typeof createPageBodySchema>;
 
+/** Document-only server file receipts; never stored in the shared Y.Doc. */
+export const DOCUMENT_FILE_STATUS_MESSAGE = 102;
+export const DOCUMENT_FILE_REQUEST_MESSAGE = 103;
+export const documentFileStatusSchema = z.object({
+  version: z.literal(1),
+  state: z.enum(['saving', 'saved', 'error']),
+  revision: z.string().nullable(),
+  history: z.string().nullable(),
+}).strict();
+export type DocumentFileStatus = z.infer<typeof documentFileStatusSchema>;
+export const documentTextReplacementSchema = z.object({
+  oldText: z.string().min(1).max(1_048_576),
+  newText: z.string().max(1_048_576),
+}).strict();
+
 /** Document body offsets are UTF-16 code units in the LF-normalized read body. */
 export const documentRevisionSchema = z.string().regex(/^body-v1:[a-f0-9]{64}$/);
 export const DOCUMENT_BODY_MAX_BYTES = 1_048_576;

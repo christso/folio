@@ -308,4 +308,18 @@ describe('unconfirmed edits (content-loss fix, 06.10.2026)', () => {
       vi.useRealTimers();
     }
   });
+  it('offline browser status overrides a still-connected socket and updates on reconnect', async () => {
+    stubAuthFetch(null);
+    const { result } = renderHook(() => { const session = useCollabSession('offline-cue', 'ws://x/collab', { share: 'tok' }); return { session, status: useConnectionStatus(session) }; }, { wrapper });
+    await waitFor(() => expect(result.current.session).not.toBeNull());
+    const provider = providers.created.at(-1) as unknown as { wsconnected: boolean; emit: (e: string, v: unknown) => void };
+    act(() => { provider.wsconnected = true; provider.emit('status', { status: 'connected' }); });
+    expect(result.current.status).toBe('connected');
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    act(() => window.dispatchEvent(new Event('offline')));
+    expect(result.current.status).toBe('offline');
+    online.mockReturnValue(true); act(() => window.dispatchEvent(new Event('online')));
+    expect(result.current.status).toBe('connected'); online.mockRestore();
+  });
+
 });

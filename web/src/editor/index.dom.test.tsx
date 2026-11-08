@@ -660,3 +660,19 @@ describe('PageEditor connection dot', () => {
     expect(statusBadge(mount())!.getAttribute('aria-label')).toBe('Collaboration: connected');
   });
 });
+
+describe('document file-save clarity', () => {
+  it('shows a storage failure despite connection and receipt, and retries without changing text', () => {
+    const retry = vi.fn();
+    const fileSnapshot = { state: 'error' };
+    const doc = new Y.Doc();
+    collab.session = { doc, ytext: doc.getText('content'), provider: { awareness: new Awareness(doc) }, file: { getSnapshot: () => fileSnapshot, subscribe: () => () => {}, retry }, ack: { isConfirmed: () => true, subscribe: () => () => {} } };
+    const container = mount({ readOnly: false });
+    const save = container.querySelector('[data-file-state="error"]')!;
+    expect(save.textContent).toContain('File save failed');
+    expect(save.textContent).toContain('Received by server');
+    expect(save.textContent).toContain('Git publication not confirmed');
+    act(() => (save.querySelector('button') as HTMLButtonElement).click());
+    expect(retry).toHaveBeenCalledOnce();
+  });
+});

@@ -3431,3 +3431,10 @@ body:has([data-app-modal]) :is(
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+.folio-editor__file-save { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.4rem; max-width: 14rem; min-width: 0; font-size: 0.75rem; line-height: 1.25; }
+.folio-editor__file-save small { width: 100%; color: var(--folio-ed-faint); font-size: 0.65rem; }
+.folio-editor__file-save[data-file-state='error'] { color: var(--folio-ed-danger); }
+.folio-editor__file-save[data-file-state='saved'] > span { color: var(--folio-ed-ok); }
+.folio-editor__file-save button { text-decoration: underline; cursor: pointer; font: inherit; }
+@media (max-width: 600px) { .folio-editor__file-save { max-width: 9rem; font-size: 0.7rem; } }

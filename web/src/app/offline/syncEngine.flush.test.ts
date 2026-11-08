@@ -24,6 +24,11 @@ const world = vi.hoisted(() => ({
   server: null as unknown as import('yjs').Doc,
   /** Whether the server applies what the client sends (false = a read-only connection). */
   accepts: true,
+  fileSaved: true,
+}));
+
+vi.mock('../collabFileStatus', () => ({
+  trackDocumentFileStatus: () => ({ whenConfirmed: async () => world.fileSaved, dispose() {} }),
 }));
 
 vi.mock('./ydocPersistence', async (original) => ({
@@ -110,6 +115,7 @@ beforeEach(() => {
   Y.applyUpdate(local, Y.encodeStateAsUpdate(world.server));
   local.getText('content').insert(7, 'typed offline\n');
   world.onDisk = Y.encodeStateAsUpdate(local);
+  world.fileSaved = true;
   world.cleared = 0;
   world.destroyed = 0;
 });
@@ -135,6 +141,16 @@ describe('flushDirtyDoc', () => {
     expect(world.cleared).toBe(0);
     expect(world.destroyed).toBe(1);
     expect(isDocDirty('p1')).toBe(true);
+  });
+
+  it('retains a received offline edit until file and snapshot persistence is confirmed', async () => {
+    world.accepts = true; world.fileSaved = false;
+    await flushOnce();
+    expect(world.server.getText('content').toString()).toContain('typed offline');
+    expect(world.cleared).toBe(0); expect(isDocDirty('p1')).toBe(true);
+    world.fileSaved = true;
+    await flushOnce();
+    expect(world.cleared).toBe(1); expect(isDocDirty('p1')).toBe(false);
   });
 
   it('deletes the copy once the server state vector covers it', async () => {

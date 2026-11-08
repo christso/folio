@@ -20,6 +20,7 @@ import { buildFolioMcpServer } from './mcp.js';
 import { HttpError } from './errors.js';
 import { bodyRevision } from './documentEdits.js';
 import * as pageAccess from './pageAccess.js';
+import { trackDocumentFileStatus } from '../web/src/app/collabFileStatus.js';
 import type { User } from '../shared/contracts.js';
 
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 60_000 });
@@ -379,6 +380,36 @@ describe('guarded editing through actual storage, REST and MCP', () => {
     const child = await storage.createPage({ space, parentPath: p.path.replace(/\.md$/, ''), title: 'Child', kind: 'doc' });
     const inherited = await app.inject({ method: 'PUT', url: `/api/pages/${child.id}`, headers: { authorization: `Bearer ${deniedToken}` }, payload });
     expect(inherited.statusCode).toBe(403);
+  });
+
+  it('reports storage failure over the authorized socket and confirms recovery without replacing the live room', async () => {
+    const p = await page();
+    const doc = new Y.Doc();
+    const cookieWs = class extends WS {
+      constructor(url: string, protocols?: string | string[]) { super(url, protocols, { headers: { Cookie: cookie } }); }
+    } as unknown as typeof globalThis.WebSocket;
+    const provider = new WebsocketProvider(`ws://127.0.0.1:${port}/collab`, p.id, doc, { WebSocketPolyfill: cookieWs, disableBc: true });
+    const file = trackDocumentFileStatus(provider, doc, p.id);
+    try {
+      await vi.waitFor(() => expect(file.isConfirmed()).toBe(true));
+      const room = docs.get(p.id);
+      const write = storage.writeDocBodyIfChanged;
+      const failed = vi.spyOn(storage, 'writeDocBodyIfChanged').mockImplementation(async (...args) => {
+        if (args[0] === p.id) throw new Error('Synthetic file failure');
+        return write(...args);
+      });
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        doc.getText('content').insert(doc.getText('content').length, 'Typed during failure\n');
+        await vi.waitFor(() => expect(file.getSnapshot().state).toBe('error'));
+        expect(file.isConfirmed()).toBe(false);
+        expect(await storage.readFreshDocBody(p.id)).not.toContain('Typed during failure');
+      } finally { failed.mockRestore(); errors.mockRestore(); }
+      file.retry();
+      await vi.waitFor(() => expect(file.isConfirmed()).toBe(true));
+      expect(docs.get(p.id)).toBe(room);
+      expect(await storage.readFreshDocBody(p.id)).toContain('Typed during failure');
+    } finally { file.dispose(); provider.destroy(); doc.destroy(); }
   });
 
   it('keeps bot edits and browser typing over the real collaboration socket, including a close/reopen', async () => {
