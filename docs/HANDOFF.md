@@ -6,6 +6,13 @@ update rather than appended to, so there is no history to dig through.
 
 Version: **0.2.0**.
 
+## Fork maintenance
+
+The maintained default branch is `christso/main`; `main` mirrors upstream.
+Follow the branch and integration workflow in [AGENTS.md](../AGENTS.md#working-rules).
+The branch alignment preserves the released fixes and both issue evidence sets;
+its follow-up changes only instructions and CI routing, not application code.
+
 ## What Folio is
 
 A team wiki whose content lives in Git. People write in the browser, together

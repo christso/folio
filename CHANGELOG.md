@@ -61,6 +61,10 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
 
 ### Changed
 
+- **Fork maintenance:** `christso/main` is the maintained default branch;
+  `main` mirrors upstream. Contribution instructions target the maintained
+  branch, and push CI covers both branches.
+
 - **Pages without a stored id get a stable one.** A document or whiteboard
   found on disk without an `id` used to get a random identifier each time
   the instance was rebuilt, so links to it broke. It now gets an id derived
