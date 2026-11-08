@@ -145,6 +145,7 @@ export interface TreeNode extends PageMeta {
 /** Full page payload: markdown body (frontmatter stripped) for docs, svg source for boards. */
 export const pageDocSchema = pageMetaSchema.extend({
   markdown: z.string().optional(),
+  revision: z.string().optional(),
   svg: z.string().optional(),
   /**
    * A doc of a light-footprint space (a repository sub-folder with rootPath
@@ -1281,8 +1282,47 @@ export const createPageBodySchema = z.object({
 });
 export type CreatePageBody = z.infer<typeof createPageBodySchema>;
 
+export const DOCUMENT_BODY_MAX_BYTES = 1_048_576;
+/** Document-only server file receipts; never stored in the shared Y.Doc. */
+export const DOCUMENT_FILE_STATUS_MESSAGE = 102;
+export const DOCUMENT_FILE_REQUEST_MESSAGE = 103;
+export const documentFileStatusSchema = z.object({
+  version: z.literal(1),
+  state: z.enum(['saving', 'saved', 'error']),
+  revision: z.string().nullable(),
+  history: z.string().nullable(),
+}).strict();
+export type DocumentFileStatus = z.infer<typeof documentFileStatusSchema>;
+export const documentTextReplacementSchema = z.object({
+  oldText: z.string().min(1).max(DOCUMENT_BODY_MAX_BYTES),
+  newText: z.string().max(DOCUMENT_BODY_MAX_BYTES),
+}).strict();
+
+/** Document body offsets are UTF-16 code units in the LF-normalized read body. */
+export const documentRevisionSchema = z.string().regex(/^body-v1:[a-f0-9]{64}$/);
+export const documentRangeEditSchema = z.object({
+  from: z.number().int().min(0),
+  to: z.number().int().min(0),
+  expectedText: z.string().max(DOCUMENT_BODY_MAX_BYTES),
+  text: z.string().max(DOCUMENT_BODY_MAX_BYTES),
+}).strict();
+export const documentBodyEditSchema = z.object({
+  expectedRevision: documentRevisionSchema,
+  markdown: z.string().max(DOCUMENT_BODY_MAX_BYTES).optional(),
+  edits: z.array(documentRangeEditSchema).min(1).max(100).optional(),
+}).strict().refine((body) => (body.markdown !== undefined) !== (body.edits !== undefined), 'provide exactly one of markdown or edits');
+export type DocumentBodyEdit = z.infer<typeof documentBodyEditSchema>;
+export interface DocumentBodyEditResult extends PageMeta {
+  revision: string;
+  changed: boolean;
+  persistence: 'file';
+  publication: 'pending';
+}
+
 export const updatePageBodySchema = z.object({
   markdown: z.string().optional(),
+  expectedRevision: documentRevisionSchema.optional(),
+  edits: z.array(documentRangeEditSchema).min(1).max(100).optional(),
   svg: z.string().optional(),
   /** Round 22: the position among siblings (frontmatter `order`) — a body with
    *  only this field is allowed: moving a page up or down does not touch the content. */

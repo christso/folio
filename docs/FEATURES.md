@@ -980,6 +980,14 @@ work continues; come back and read on from where it stopped.
 
 ## 12. Integration for external tools (MCP)
 
+Document reads return a body `revision`. Bots pass it as `expectedRevision` to
+replace a body or apply exact guarded ranges through the same Yjs room as the
+browser. Stale writes fail; unrelated characters and frontmatter are preserved.
+Success confirms file/snapshot persistence separately from Git publication.
+See [Shared agent editing](AGENT-EDITING.md) for the contract, compatibility and
+migration procedure. This is a single-page API; multi-file publishers and their
+receipts remain separate.
+
 The `/mcp` endpoint with a personal access token (`folio_pat_…`), scopes
 `read` and `write`. 49 tools: listing spaces and trees, reading a page,
 search (plus `search` and `fetch` for ChatGPT deep research), creating and updating pages, resolving a Folio link, backlinks
@@ -1048,3 +1056,7 @@ See [INSTALL](INSTALL.md).
 - **Theme**: light, dark, system.
 - **Mobile**: responsive layout, a separate mobile mode for tables. There is
   no separate app.
+
+### Shared document save and caller recovery
+
+Document editors show connection, server receipt, exact file/snapshot save and unconfirmed Git publication separately. File failure retains recovery data and offers an authorized writer retry after storage recovers; retry exhaustion is explicit. Exact-passage editing through REST/MCP tolerates unrelated typing. The built-in assistant supplies complete authorized conflict context and a bounded reconsideration budget. Strict whole-body/offset guards, permissions, private scope and publication policy remain unchanged.

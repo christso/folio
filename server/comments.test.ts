@@ -8,7 +8,7 @@ import * as fastifyCookieModule from '@fastify/cookie';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import * as Y from 'yjs';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { CommentThread, PageComment, PageCommentsResponse } from '../shared/comments.js';
 import type { User } from '../shared/contracts.js';
 import * as authStore from './auth/store.js';
@@ -218,14 +218,40 @@ describe('anchoring a quote (collab.anchorQuote)', () => {
     await teardownSchema();
   });
 
-  it('opens the room of a closed page the way a connection would, anchors in it, and closes it again', async () => {
+  it('persists anchors created after cold external-file reconciliation before returning them', async () => {
+    const original = '# Anchors\n\nOriginal paragraph.\n';
+    const page = await storage.createPage({ space, parentPath: '', title: 'External change', kind: 'doc' }, { docBody: original });
+    const saved = new Y.Doc();
+    saved.getText('content').insert(0, original);
+    await collab.storeSnapshot(page.id, saved, original);
+    saved.destroy();
+    await storage.writeDocBody(page.id, '# Anchors\n\nExternal paragraph.\n');
+    const anchor = await collab.anchorQuote(page.id, 'External paragraph.');
+    expect(anchor).toBeDefined();
+    const restored = new Y.Doc();
+    Y.applyUpdate(restored, (await collab.loadSnapshot(page.id))!);
+    const from = Y.createAbsolutePositionFromRelativePosition(Y.decodeRelativePosition(Buffer.from(anchor!.anchorFrom, 'base64')), restored);
+    const to = Y.createAbsolutePositionFromRelativePosition(Y.decodeRelativePosition(Buffer.from(anchor!.anchorTo, 'base64')), restored);
+    expect(from).not.toBeNull();
+    expect(to).not.toBeNull();
+    expect(restored.getText('content').toString().slice(from!.index, to!.index)).toBe('External paragraph.');
+    restored.destroy();
+    const failure = vi.spyOn(storage, 'writeDocBodyIfChanged').mockRejectedValue(new Error('Synthetic storage outage'));
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(collab.anchorQuote(page.id, 'External paragraph.')).rejects.toMatchObject({ status: 503, code: 'comment_anchor_persistence_failed' });
+    } finally { failure.mockRestore(); errors.mockRestore(); }
+    await collab.flushDoc(page.id);
+  });
+
+  it('anchors in the restored room and reclaims it after the idle period', async () => {
     const body = '# Anchors\n\nOne fox, two foxes.\nThree 🦊 here.\n';
     const page = await storage.createPage({ space, parentPath: '', title: 'Anchors', kind: 'doc' }, { docBody: body });
     expect(collab.isDocLive(page.id)).toBe(false);
 
     const found = await collab.anchorQuote(page.id, 'fox');
     expect(found?.quotedText).toBe('fox');
-    expect(collab.isDocLive(page.id)).toBe(false); // opened only for this, closed again
+    expect(collab.isDocLive(page.id)).toBe(true); // shared lease retains the room until idle cleanup
 
     // The anchors resolve against the room state the next opening restores.
     const stored = await collab.loadSnapshot(page.id);
@@ -243,6 +269,12 @@ describe('anchoring a quote (collab.anchorQuote)', () => {
     expect(text.slice(resolve(emoji!.anchorFrom), resolve(emoji!.anchorTo))).toBe('🦊 here');
     expect(await collab.anchorQuote(page.id, 'not on the page')).toBeUndefined();
     expect(await collab.anchorQuote(page.id, 'foxes.\r\nThree')).toMatchObject({ quotedText: 'foxes.\nThree' }); // CRLF in the quote is normalised
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      await collab.anchorQuote(page.id, 'fox');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(collab.isDocLive(page.id)).toBe(false);
+    } finally { vi.useRealTimers(); doc.destroy(); }
   });
 });
 

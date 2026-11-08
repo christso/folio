@@ -145,6 +145,27 @@ what is not there.
 
 ## Agents
 
+Strict MCP `update_page` and PAT REST document PUT whole-body/offset edits
+require the exact read revision.
+A stale revision is rejected even for a change elsewhere in the body; ranges
+are not automatically rebased. Sustained typing can starve a caller that repeatedly
+prepares edits from a changing body; callers need bounded retries and a quiet
+moment, rather than blind revision substitution. This protects server-received text, while later
+offline/browser operations follow Yjs merge semantics. Legacy cookie body PUT
+and internal replacements remain unguarded. Document edits are capped at 1 MiB
+and 100 ranges. They do not provide atomic page/index/log publication, durable
+request-id receipts or a prepublication approval queue. See
+[Shared agent editing](AGENT-EDITING.md). Browser documents now show exact file/snapshot confirmation separately from
+receipt and unverified Git publication. Storage retry is bounded; failure
+remains visible with manual recovery. The additive exact-passage tool permits
+unrelated typing but refuses ambiguous/changed/recreated source quotations;
+it is location-independent and is not a general append or exactly-once
+request journal. The built-in assistant enforces two conflicts and, separately, two uncertain
+write outcomes per page/run; external clients need their own bounded caller
+recovery. The open-session registry is tab-local, not a cross-tab lock. A
+bounded two-tab IndexedDB close/reopen check passed; this does not establish
+arbitrary cross-tab cleanup atomicity.
+
 12. **Through MCP you cannot**: create an `index.md` for a folder, manage
     access rights, rename or delete a space. Those actions go through the
     interface only.

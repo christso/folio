@@ -26,6 +26,7 @@
 import { useSyncExternalStore } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { WebsocketProvider } from 'y-websocket';
+import { trackDocumentFileStatus } from '../collabFileStatus';
 import { trackServerAck } from '../collabAck';
 import * as Y from 'yjs';
 import type { PageMeta } from '@shared/contracts';
@@ -149,12 +150,13 @@ function collabUrl(): string {
 }
 
 /** Load the local copy, connect, wait for the merge, delete the local copy. `false` = not this time. */
-async function flushDirtyDoc(pageId: string): Promise<boolean> {
+async function flushDirtyDoc(pageId: string, kind: 'doc' | 'board'): Promise<boolean> {
   const doc = new Y.Doc();
   const persistence = persistYDoc(pageId, doc);
   await persistence.whenLoaded;
   const provider = new WebsocketProvider(collabUrl(), pageId, doc, { connect: false });
   const ack = trackServerAck(provider, doc);
+  const file = kind === 'doc' ? trackDocumentFileStatus(provider, doc, pageId) : undefined;
   try {
     const synced = new Promise<boolean>((resolve) => {
       const timeout = setTimeout(() => resolve(false), FLUSH_SYNC_TIMEOUT_MS);
@@ -174,15 +176,16 @@ async function flushDirtyDoc(pageId: string): Promise<boolean> {
     // own state vector covers it (app/collabAck.ts). A read-only connection —
     // the server drops a viewer's updates without a word — never confirms, and
     // the copy stays for the user to see in the unsynced list.
-    const confirmed = provider.wsconnected && (await ack.whenConfirmed(FLUSH_SYNC_TIMEOUT_MS));
-    if (!confirmed || !provider.wsconnected) {
+    const confirmed = provider.wsconnected && (await ack.whenConfirmed(FLUSH_SYNC_TIMEOUT_MS)) && (!file || await file.whenConfirmed(FLUSH_SYNC_TIMEOUT_MS));
+    if (!confirmed || !provider.wsconnected || isSessionOpen(pageId)) {
       persistence.destroy();
       return false;
     }
     await persistence.clear();
-    markDocClean(pageId);
+    if (!isSessionOpen(pageId)) markDocClean(pageId);
     return true;
   } finally {
+    file?.dispose();
     ack.dispose();
     provider.destroy();
     doc.destroy();
@@ -214,7 +217,7 @@ async function run(): Promise<void> {
   for (const dirty of listDirtyDocs()) {
     if (isSessionOpen(dirty.pageId)) continue;
     try {
-      if (await flushDirtyDoc(dirty.pageId)) synced += 1;
+      if (await flushDirtyDoc(dirty.pageId, dirty.kind)) synced += 1;
     } catch (error) {
       // eslint-disable-next-line no-console
       console.warn(`[offline] could not flush unsynced page ${dirty.pageId}:`, error);

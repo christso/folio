@@ -63,11 +63,11 @@ describe('server/mcp.ts — server identity', () => {
 describe('server/mcp.ts — tool annotations and instructions', () => {
   const actor: McpActor = { user: { id: 'nobody' } as User, scopes: ['read'], tokenId: 'test-annotations-token' };
 
-  it('annotates all 49 tools: a title, explicit booleans, and readOnlyHint or destructiveHint', async () => {
+  it('annotates all 50 tools: a title, explicit booleans, and readOnlyHint or destructiveHint', async () => {
     const { client, close } = await connectedClient(actor);
     try {
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(49);
+      expect(tools).toHaveLength(50);
       for (const tool of tools) {
         const a = tool.annotations;
         expect(a?.title ?? tool.title, `${tool.name} title`).toBeTruthy();
@@ -119,7 +119,7 @@ describe('server/mcp.ts — tool annotations and instructions', () => {
         [
           'add_comment', 'board_ops', 'convert_canvas_to_board', 'create_board', 'create_form', 'create_page', 'create_page_from_template', 'create_template', 'folio_table_add_column', 'folio_table_create', 'folio_table_delete',
           'folio_table_delete_column', 'folio_table_delete_view', 'folio_table_insert', 'folio_table_save_view', 'folio_table_update', 'folio_table_update_column', 'publish_artifact', 'rename_tag',
-          'reply_comment', 'save_base', 'save_page_as_template', 'set_page_properties', 'update_board', 'update_form', 'update_page',
+          'replace_page_text', 'reply_comment', 'save_base', 'save_page_as_template', 'set_page_properties', 'update_board', 'update_form', 'update_page',
         ],
       );
       // The public demo's write limit (demoLimits.ts) counts exactly these names: a new write tool must be added to the list.
@@ -583,7 +583,7 @@ describe('server/mcp.ts — search and fetch (ChatGPT deep research format; real
     expect(r.isError).toBeFalsy();
     const body = parsed(r);
     expect(r.structuredContent).toEqual(body);
-    expect(Object.keys(body).sort()).toEqual(['id', 'metadata', 'text', 'title', 'url']);
+    expect(Object.keys(body).sort()).toEqual(['id', 'metadata', 'revision', 'text', 'title', 'url']);
     expect(body).toMatchObject({ id: openDocId, title: 'Open handbook', url: `https://folio.example.com/s/${ownSpace}/p/${openDocId}` });
     expect(body.text).toContain(`The ${marker} lives here.`);
     expect(body.metadata).toMatchObject({ space: ownSpace, kind: 'doc' });
@@ -675,7 +675,8 @@ describe('server/mcp.ts — search and fetch (ChatGPT deep research format; real
       await client.listTools(); // the client validates every later result against the cached outputSchema
       const doc = await run('create_page', { space: ownSpace, parentPath: '', title: 'Structured doc', markdown: '# Structured doc\n\nBody.\n' });
       expect(doc).toMatchObject({ kind: 'doc', title: 'Structured doc' });
-      expect(await run('update_page', { id: doc.id, markdown: '# Structured doc\n\nChanged.\n' })).toMatchObject({ id: doc.id });
+      const readDoc = await run('read_page', { id: doc.id });
+      expect(await run('update_page', { id: doc.id, expectedRevision: readDoc.revision, markdown: '# Structured doc\n\nChanged.\n' })).toMatchObject({ id: doc.id });
       const board = await run('create_board', { space: ownSpace, parentPath: '', title: 'Structured board', sketch: { nodes: [{ id: 'a', type: 'rectangle', label: 'A', x: 0, y: 0 }, { id: 'b', type: 'rectangle', label: 'B', x: 300, y: 40 }], edges: [{ from: 'a', to: 'b' }] } });
       expect(board).toMatchObject({ kind: 'board' });
       expect(await run('update_board', { id: board.id, sketch: { nodes: [{ id: 'a', type: 'rectangle', label: 'A', x: 0, y: 0 }], edges: [] } })).toMatchObject({ id: board.id });

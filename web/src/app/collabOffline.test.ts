@@ -26,6 +26,11 @@ const disk = vi.hoisted(() => ({
   clearedByName: [] as string[],
 }));
 
+const fileState = vi.hoisted(() => ({ confirmed: true }));
+vi.mock('./collabFileStatus', () => ({
+  trackDocumentFileStatus: () => ({ isConfirmed: () => fileState.confirmed, subscribe: () => () => {}, dispose() {} }),
+}));
+
 vi.mock('./offline/ydocPersistence', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./offline/ydocPersistence')>()),
   persistYDoc: (pageId: string) => {
@@ -101,6 +106,7 @@ function syncedMeta(page: LocalPage): PageMeta {
 }
 
 beforeEach(() => {
+  fileState.confirmed = true;
   resetLocalPagesForTests();
   resetDirtyDocsForTests();
   disk.created.length = 0;
@@ -111,6 +117,20 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+describe('document file persistence retention', () => {
+  it('retains a received document until its file is confirmed, including navigation with remote-only changes', async () => {
+    fileState.confirmed = false;
+    const { doc, provider, session } = attach('pending-file');
+    await session.ready;
+    doc.transact(() => doc.getText('content').insert(0, 'Remote accepted text'), provider);
+    provider.becomeSynced();
+    session.dispose();
+    expect(disk.created.at(-1)!.clear).not.toHaveBeenCalled();
+    expect(isDocDirty('pending-file')).toBe(true);
+    doc.destroy();
+  });
 });
 
 describe('a local page (created offline)', () => {

@@ -52,6 +52,8 @@ Every page has:
   the frontmatter (`order`, `icon`, `cover`); the server manages them itself,
   the agent does not write them by hand.
 
+Document reads return the exact Markdown body and `revision`. To edit, pass that revision as `expectedRevision` to `update_page`, with a replacement body or guarded ranges. Reconcile a stale result after rereading. Success confirms file/snapshot persistence; Git publication and indexing are separate.
+
 ## Access rights
 
 - The base role is set by the space: `viewer` (reading), `editor` (writing),
@@ -106,3 +108,5 @@ A base is a saved query (Obsidian's YAML): its rows are the pages of the
 space that match its filters, its columns their properties. It stores no data
 of its own — a value shown in a base is changed on the page itself
 (`set_page_properties`). The detailed contract is in the `folio-bases` skill.
+
+For an unchanged unique passage use replace_page_text with sufficient exact context; unrelated typing can continue. Strict whole-body/range writes still require the exact read revision. Reconsider returned conflict context and stop when the per-page/run budget is exhausted. Explicitly reread after an uncertain write outcome before proposing another change. File confirmation and Git publication are separate.

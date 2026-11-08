@@ -144,6 +144,7 @@ export const outputSchemas = {
   read_page: {
     ...pageMetaOutput.shape,
     markdown: z.string().optional().describe('Document body as Markdown (doc pages)'),
+    revision: z.string().optional().describe('Exact document body revision; pass as expectedRevision to update_page'),
     svg: z.string().optional().describe('Raw SVG source (board pages when no layout summary applies)'),
     scene: z.record(z.string(), z.unknown()).nullable().optional().describe('Board layout summary: shapes, arrows, texts, frames, layout rows/cols, bounds; null when the board has no readable scene'),
     note: z.string().optional().describe('Why the content is not returned (PDF/Office file, unreadable board)'),
@@ -163,6 +164,13 @@ export const outputSchemas = {
     entryHtml: z.string().optional().describe('Artifact pages: the HTML of the entry page'),
   },
   page: pageMetaOutput.shape,
+  body_edit: {
+    ...pageMetaOutput.shape,
+    revision: z.string().describe('Accepted body revision; later edits may already have advanced it'),
+    changed: z.boolean().describe('Whether this request changed the body'),
+    persistence: z.literal('file').describe('File and collaborative snapshot persistence confirmed'),
+    publication: z.literal('pending').describe('Git publication and indexing are not confirmed by this response'),
+  },
   list_templates: {
     templates: z.array(pageMetaOutput.extend({ description: z.string().optional().describe('What the template is for, when it has a description') })).describe('Templates of the space'),
   },
@@ -192,6 +200,7 @@ export const outputSchemas = {
   },
   fetch: {
     id: z.string().describe('Page id'),
+    revision: z.string().optional().describe('Document body revision; pass as expectedRevision to update_page'),
     title: z.string().describe('Page title'),
     text: z.string().describe('Page content as Markdown'),
     url: z.string().describe('Link to the page in Folio'),

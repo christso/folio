@@ -3,15 +3,16 @@
  * GET /api/spaces, and the MCP tool `check_page_writing_rules` — readable by a plain member although `.agent`
  * itself is admin-only, a "no rules" answer, and the documents-only / no-access gates.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { setUpTestSchema, deleteTestSpace } from './db/testSchema.js';
 import * as storage from './storage.js';
+import * as collab from './collab.js';
 import * as authStore from './auth/store.js';
 import { buildFolioMcpServer, type McpActor } from './mcp.js';
 import { buildAgentRulesInfo } from './routes.js';
-import { createStarterWritingRules, findWritingRulesEntry, loadWritingRules } from './writingRules.js';
+import { createStarterWritingRules, docMarkdown, findWritingRulesEntry, loadWritingRules } from './writingRules.js';
 import { serverText } from './serverText.js';
 import { WRITING_RULES_PATH } from '../shared/contracts.js';
 import type { User } from '../shared/contracts.js';
@@ -128,6 +129,33 @@ describe('writing rules', () => {
     const stranger = await call({ user: outsider, scopes: ['read'], tokenId: 'wr-out' }, 'check_page_writing_rules', { page: draftId });
     expect(stranger.isError).toBe(true);
     expect(stranger.text).toContain('page not found');
+  });
+
+  it('waits for a concurrent cold read before supplying document text to a rules check', async () => {
+    const body = '# Review\n\nKeep the complete paragraph.\n';
+    const page = await storage.createPage({ space: withRules, parentPath: '', title: 'Cold review', kind: 'doc' }, { docBody: body });
+    const entry = await storage.requireEntry(page.id);
+    const read = storage.readFreshDocBody;
+    let entered!: () => void;
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { entered = resolve; });
+    const hold = new Promise<void>((resolve) => { release = resolve; });
+    const spy = vi.spyOn(storage, 'readFreshDocBody').mockImplementation(async (id) => {
+      if (id === page.id) { entered(); await hold; }
+      return read(id);
+    });
+    const opening = collab.readDocumentBody(page.id);
+    let checking: Promise<string> | undefined;
+    try {
+      await blocked;
+      let finished = false;
+      checking = docMarkdown(entry).then((text) => { finished = true; return text; });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(finished).toBe(false);
+      release();
+      expect(await checking).toBe(body);
+      expect((await opening).markdown).toBe(body);
+    } finally { release(); spy.mockRestore(); await Promise.allSettled([opening, checking]); }
   });
 
   it('is not offered on a public site', async () => {
