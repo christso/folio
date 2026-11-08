@@ -952,6 +952,16 @@ export function registerRoutes(app: FastifyInstance): void {
     return meta;
   });
 
+  app.post('/api/pages/:id/replace-text', async (request, reply) => {
+    session.requireWriteScope(request);
+    const { id } = request.params as { id: string };
+    const entry = await session.requirePageRole(request, id, 'editor');
+    if (entry.kind !== 'doc') throw badRequest('replace-text only supports documents');
+    const user = request.authUser!;
+    try { return await collab.replaceDocumentText(id, request.body, { name: user.name, email: user.email }); }
+    catch (err) { if (err instanceof DocumentEditError) return reply.status(err.status).send(err.toJSON()); throw err; }
+  });
+
   app.get('/api/pages/:id', async (request) => {
     const { id } = request.params as { id: string };
     const entry = await session.requirePageRole(request, id, 'viewer');

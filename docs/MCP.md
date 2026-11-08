@@ -93,7 +93,7 @@ Clients are public (no client secret). Redirect URIs must be `https`, or `http` 
 | Data tables (scope `write`) | `folio_table_insert`, `folio_table_update`, `folio_table_delete`, `folio_table_add_column`, `folio_table_update_column`, `folio_table_delete_column`, `folio_table_save_view`, `folio_table_delete_view`, `folio_table_create` |
 | Forms (scope `write`) | `create_form`, `update_form` (read a form with `read_page`) |
 
-49 tools: 23 read-only, 26 that write.
+50 tools: 23 read-only, 27 that write.
 
 **Comments.** `list_comments(page, status?)` returns a document's inline comment threads (`id`, quoted text, `status` open or resolved, the comments oldest first) and whether you may reply; `add_comment(page, quote, body)` starts a thread on the first occurrence of `quote` in the page's current Markdown (copy it exactly from `read_page`; an error when it is not found); `reply_comment(threadId, body)` answers a thread. The author is the token's owner. Comments are not part of the page's Markdown or Git. Refused on public sites.
 
@@ -278,3 +278,9 @@ which state the reason.
 For a large number of changes the cheaper and more reliable way is
 `git clone` → local edits → `git push` → `POST /api/spaces/:space/sync`. The
 index is rebuilt from the files automatically.
+
+## Exact passage edits and bounded recovery
+
+`replace_page_text(id, oldText, newText)` is the additive document passage tool; REST offers `POST /api/pages/:id/replace-text` with `oldText` and `newText`. It replaces one exact, nonempty, unique quotation in the current body, permitting unrelated typing. The resulting body must consume the source quotation on changes; missing/ambiguous/recreated quotations fail without mutation. This is explicit location-independent intent, with the same body limits, access, attribution and file/publication results as guarded updates. Strict `update_page` revisions remain required.
+
+The built-in assistant returns complete authorized conflict context and enforces a shared two-conflict page/run budget. Unknown outcomes block writes until an explicit complete read, and two uncertain write outcomes stop further body writes for that page/run even if reads interleave. Incomplete reads supply no revision. External clients must implement equivalent bounded recovery themselves. See [Shared agent editing](AGENT-EDITING.md) for the precise matching, retry and publication contract.

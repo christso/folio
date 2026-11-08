@@ -321,6 +321,7 @@ export function PageEditor({
         )}
       </div>
 
+      <FileSaveNotice session={session} readOnly={readOnly} />
       {typeof belowChrome === 'function' ? belowChrome(mode) : belowChrome}
 
       {mode === 'reading' ? (
@@ -601,17 +602,31 @@ function PanelToggle() {
 
 const UNCONFIRMED_FILE = { state: 'unconfirmed' as const };
 const noFileSubscription = () => () => {};
+function documentSaveState(fileState: string, connection: ConnectionStatus, received: boolean): string {
+  if (fileState === 'error') return 'error';
+  if (connection === 'offline') return 'offline';
+  if (connection === 'connecting') return 'unconfirmed';
+  if (!received) return 'unreceived';
+  if (fileState === 'unconfirmed') return 'unconfirmed';
+  return fileState === 'saved' ? 'saved' : 'saving';
+}
+function FileSaveNotice({ session, readOnly }: { session: CollabSession | null; readOnly?: boolean }) {
+  const { t } = useTranslation(NS);
+  const file = session?.file;
+  const snapshot = useSyncExternalStore(file?.subscribe ?? noFileSubscription, file?.getSnapshot ?? (() => UNCONFIRMED_FILE));
+  return snapshot.state === 'error' ? <div className="folio-editor__save-error" role="alert">{t('fileSave.errorHint')} {t(readOnly ? 'fileSave.viewerHint' : 'fileSave.retryHint')}</div> : null;
+}
 function FileSaveBadge({ session, connection, readOnly }: { session: CollabSession | null; connection: ConnectionStatus; readOnly?: boolean }) {
   const { t } = useTranslation(NS);
   const file = session?.file;
   const snapshot = useSyncExternalStore(file?.subscribe ?? noFileSubscription, file?.getSnapshot ?? (() => UNCONFIRMED_FILE));
   const received = useSyncExternalStore(session?.ack?.subscribe ?? noFileSubscription, session?.ack?.isConfirmed ?? (() => false));
-  const state = snapshot.state === 'error' ? 'error' : connection === 'offline' ? 'offline' : connection === 'connecting' ? 'unconfirmed' : !received ? 'unreceived' : snapshot.state === 'saved' ? 'saved' : 'saving';
+  const state = documentSaveState(snapshot.state, connection, received);
   return <span className="folio-editor__file-save" data-file-state={state} role="status" aria-live="polite">
     <span title={t(`fileSave.${state}Hint`)}>{t(`fileSave.${state}`)}</span>
     {connection === 'connected' && received ? <small>{t('fileSave.received')}</small> : null}
     <small>{t('fileSave.publication')}</small>
-    {state === 'error' && !readOnly ? <button type="button" onClick={() => file?.retry()}>{t('fileSave.retry')}</button> : null}
+    {state === 'error' && !readOnly ? <button type="button" disabled={connection !== 'connected'} onClick={() => file?.retry()}>{t('fileSave.retry')}</button> : null}
   </span>;
 }
 

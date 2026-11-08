@@ -31,6 +31,31 @@ Offsets are zero-based UTF-16 code units, `to` exclusive, in the LF-normalized b
 
 Requests accept exactly one of `markdown` or `edits` (1–100 ranges), without metadata fields. Edit strings together and the resulting body are limited to 1 MiB of UTF-8; individual strings are also bounded. REST's HTTP request-size limit still applies, including JSON overhead. Use LF and complete Unicode characters. Leading YAML frontmatter is refused: use the properties API with its own ETag for metadata. The existing frontmatter remains in the file.
 
+## Passage replacement during unrelated typing
+
+For a change whose intent is “replace this exact unique passage wherever it occurs in this page”, use MCP `replace_page_text` or REST `POST /api/pages/:id/replace-text`:
+
+```json
+{
+  "oldText": "The retry limit is three attempts.",
+  "newText": "The retry limit is five attempts."
+}
+```
+
+MCP also takes `id`. Read the complete page first and choose enough exact context to express the intended passage. The server resolves and checks the quotation against the restored current body, then mutates synchronously. Unrelated typing can continue without a network read/write revision gap. Existing `update_page` and offset/full-body REST PUT retain strict revision checks.
+
+Exactly one nonempty occurrence must exist, including overlapping matches. Missing, changed or duplicate quotations return bounded 409 `quote_conflict` without mutation. A changed result must consume the source quotation throughout the entire resulting body, including across replacement boundaries. A no-op may keep the same quotation and confirms persistence without attribution. True appends that preserve the source passage use strict guarded ranges; do not rewrite prose just to consume a guard. Limits, Unicode/LF checks, frontmatter protection, permissions, attribution and persistence results are the same as strict editing.
+
+This is explicit location-independent intent. It does not prove semantic continuity if surrounding context changed or an identical passage moved. There is no fuzzy search, occurrence-index fallback or automatic conversion of stale offset edits. Immediate replay normally fails because its quotation was consumed. A later author can restore the old quotation, so this is not durable exactly-once journaling. A lost response or 503 still requires readback and reconsideration.
+
+## Supported assistant recovery
+
+The built-in Agent-mode assistant actually calls these MCP tools. Its wrapper handles a body conflict by returning a complete authorized `read_page` result for reconsideration. It shares a two-conflict budget per page/run across `update_page` and `replace_page_text`; once exhausted, further body writes stop with `edit_retry_budget_exhausted`. Read-only inspection remains available. The wrapper serializes its own concurrent body calls and never silently swaps revisions or replays a mutation. Sustained changes to the intended passage may legitimately require a quiet moment or a new owner decision.
+
+A failed, denied or oversized recovery read returns `reconsider_read_unavailable` without a usable revision. Unknown write outcomes, including persistence failure, block further body writes with `edit_outcome_unknown` until an explicit complete read. Reconsider the user request against that read; if the intended change is already present, a guarded no-op can confirm the current file state after storage recovers. A separate two-uncertain-write budget per page/run survives those explicit reads; after the second uncertain write, further body writes stop with `edit_outcome_unknown`. Gate refusals and failed reads do not consume another write outcome. No response claims publication.
+
+These controls run in the built-in assistant tool wrapper. External MCP clients receive the new tool and bounded errors, but must implement their own task-level retry budget and user explanation. This patch does not install or migrate a production editing adapter.
+
 ## Conflict and completion results
 
 A successful response includes the page metadata plus:
@@ -59,7 +84,9 @@ Success confirms a Markdown or MDX file write/check and collaborative snapshot p
 | 413 `body_edit_too_large` | Input or resulting body exceeds the limit. Schema-level character/count limits may return 400; HTTP size limits may return 413. |
 | 503 `body_persistence_failed` | The edit may already be live, but file/snapshot persistence was not confirmed. Returns `acceptedRevision`. Read back and inspect persistence before retrying; do not report saved or publish based on this error. |
 
-Browser connection/acknowledgement indicators describe transport and server receipt, not this API's file-persistence result or Git publication. A bot's 503 is not currently shown as a browser save error; an adapter must communicate the failure to its caller. No integrated bot conflict/retry UI is shipped here.
+Browser document UI separates connection, server receipt, and file/snapshot confirmation. `File saved` requires the exact body and canonical collaborative history to match a server persistence receipt. New typing, pure deletions and identical text under newer character identities invalidate that confirmation. A visible failure survives typing/reconnect until matching recovery. Automatic retries are limited; after storage recovers an editor can choose `Retry file save`, which flushes the current writer without replacing text. Readers receive guidance to ask an editor. Keep the tab open or export a copy while unconfirmed. Missing verification capability/receipts are explicitly unconfirmed.
+
+Document offline copies and background flush records are cleared only after both server receipt and file/snapshot confirmation. Share sessions retain their existing policy of no IndexedDB copy. Offline browser state overrides a stale connected tooltip. Git publication stays explicitly unconfirmed, separate from these file-save cues.
 
 MCP returns the same bounded guarded-error object as JSON text in an `isError` result. Invalid MCP schemas may instead return SDK validation errors. Authorization failures use existing interface semantics; they reveal no body or revision. Snapshot acquisition failures fail closed, preserving stored state.
 

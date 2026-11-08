@@ -86,6 +86,12 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
   Snapshot acquisition fails closed and overlapping persistence is serialized.
   Comment anchors share the room lease and confirm durable identities; writing
   rule checks wait for cold rooms to finish restoring.
+- Separate browser document connection/receipt from exact file and snapshot
+  confirmation and unverified Git publication. Retain failed-save recovery
+  copies, show bounded-retry guidance, and let editors retry the current writer.
+  Offline cues now agree. Add exact unique-passage REST/MCP editing during
+  unrelated typing and bounded reread/reconsideration in the supported assistant.
+  Existing strict revision edits and publication policy remain unchanged.
 
 - **Git sync no longer publishes an unresolved deletion or binary conflict.**
   When Folio deleted a page that Git edited (or the reverse), or both sides

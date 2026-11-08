@@ -397,19 +397,21 @@
   },
   "fileSave": {
     "saving": "Saving to file…",
-    "savingHint": "File and collaborative snapshot confirmation is pending. Connection and server receipt are separate.",
+    "savingHint": "Your latest changes have not yet been confirmed as saved. Connection and receipt are shown separately.",
     "saved": "File saved",
-    "savedHint": "This document state was saved to its file and collaborative snapshot. Git publication is separate.",
+    "savedHint": "Your latest changes were confirmed as saved to the document file. Publishing to Git is separate.",
     "error": "File save failed",
-    "errorHint": "File or snapshot persistence failed. Keep this tab open or export a copy. Your text has not been replaced; the server will retry.",
+    "errorHint": "Your latest changes could not be confirmed as saved. Automatic retries are limited. Keep this tab open or export a copy.",
     "offline": "Offline — file save unconfirmed",
     "offlineHint": "Edits stay on this device until connection and file persistence are confirmed.",
     "unreceived": "Waiting for server receipt",
     "unreceivedHint": "The server has not confirmed receiving your latest changes.",
     "unconfirmed": "File save unconfirmed",
-    "unconfirmedHint": "No current file/snapshot confirmation is available. Keep this tab open or export a copy.",
+    "unconfirmedHint": "A current save confirmation is unavailable. Keep this tab open or export a copy.",
     "retry": "Retry file save",
     "publication": "Git publication not confirmed",
-    "received": "Received by server"
+    "received": "Received by server",
+    "retryHint": "After storage recovers, use Retry file save.",
+    "viewerHint": "Ask an editor to retry the file save after storage recovers."
   }
 }

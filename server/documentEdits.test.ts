@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { documentBodyEditSchema } from '../shared/contracts.js';
-import { bodyRevision, planBodyEdit } from './documentEdits.js';
+import { bodyRevision, planBodyEdit, planTextReplacement } from './documentEdits.js';
 
 describe('guarded document body edits', () => {
   const id = 'page-a';
@@ -41,5 +41,20 @@ describe('guarded document body edits', () => {
     expect(documentBodyEditSchema.safeParse({ expectedRevision: revision, edits: [{ from: -1, to: 0, expectedText: '', text: '' }] }).success).toBe(false);
     expect(() => planBodyEdit(id, body, { expectedRevision: revision, markdown: 'x'.repeat(1_048_577) })).toThrow();
     expect(() => planBodyEdit(id, body, { expectedRevision: revision, markdown: '---\nsecret: value\n---\ntext' })).toThrow(/frontmatter/);
+  });
+});
+
+describe('explicit unique passage replacement', () => {
+  it('preserves unrelated current text and consumes the quotation so an immediate replay conflicts', () => {
+    const before = '# Page\n\nA sentence.\n\nSomeone is typing here.\n';
+    const plan = planTextReplacement('page', before, { oldText: 'A sentence.', newText: 'A reviewed sentence.' });
+    expect(plan.markdown).toBe(before.replace('A sentence.', 'A reviewed sentence.'));
+    expect(() => planTextReplacement('page', plan.markdown, { oldText: 'A sentence.', newText: 'A reviewed sentence.' })).toThrow(expect.objectContaining({ code: 'quote_conflict' }));
+  });
+  it('rejects missing/ambiguous and overlapping quotations, and guards recreated across replacement boundaries', () => {
+    for (const [body, oldText, newText] of [['none', 'absent', 'new'], ['banana', 'ana', 'new'], ['abb', 'ab', 'a'], ['word', 'word', 'word appended']]) {
+      expect(() => planTextReplacement('page', body, { oldText, newText })).toThrow(expect.objectContaining({ code: 'quote_conflict' }));
+    }
+    expect(() => planTextReplacement('page', 'body', { oldText: '', newText: 'new' })).toThrow();
   });
 });

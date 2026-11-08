@@ -217,10 +217,31 @@ source exclusions, private scopes and approval policy on their current path.
 Published readers/indexes still consume Git, not the live body. The feature branch
 merges deployment `971aaf4`, including MDX/comments and upstream deletion/binary
 conflict recovery; it does not restore the retired fork-only conflict ledger.
-Guarded edits retain opaque MDX source and unrelated snapshot roots. Browser
-acknowledgements remain receipt cues, not proof of file persistence/publication.
-Repeated conflicts under ongoing typing need bounded caller retries and
-reconsideration; no integrated bot conflict UI is included.
+Guarded edits retain opaque MDX source and unrelated snapshot roots. Browser document UI now distinguishes receipt from confirmed file/snapshot save
+and unverified Git publication. A versioned server-only socket receipt covers
+the exact body plus canonical state-vector/deletion history, independent of
+GC/retained undo text. Body and snapshot are captured before the file write
+await; an older save cannot confirm newer identities or pure deletions.
+Failure remains visible through reconnect, with truthful limited-retry guidance
+and an editor-only writer flush action. Missing receipts or hashing capability
+stay unconfirmed. Active and headless document offline cleanup require both
+receipt and file confirmation; boards and share-session privacy retain their
+existing behavior.
+
+`replace_page_text` (REST `/api/pages/:id/replace-text`) explicitly replaces one
+unchanged unique passage in the current body while unrelated typing continues.
+The whole result consumes the source quotation, including boundary recreation;
+strict full/offset revisions remain unchanged. The supported assistant wrapper
+returns complete authorized conflict context and stops body writes after two
+conflicts per page/run. Unknown outcomes require an explicit complete read
+before further writes; two uncertain write outcomes stop further body writes
+for that page/run even when complete reads interleave. External caller
+migration and its UI remain separate.
+
+The open-session registry protects only the current tab. A bounded same-browser
+two-tab check retained newer offline text after another tab flushed an older
+state and the offline tab closed/reopened. This is recovery evidence, not a
+cross-tab ownership lock or proof of every cleanup interleaving.
 
 The local checks and exact changed paths are recorded in
 [Guarded editing verification](verification/guarded-agent-editing.md).

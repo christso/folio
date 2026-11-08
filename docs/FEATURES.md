@@ -1056,3 +1056,7 @@ See [INSTALL](INSTALL.md).
 - **Theme**: light, dark, system.
 - **Mobile**: responsive layout, a separate mobile mode for tables. There is
   no separate app.
+
+### Shared document save and caller recovery
+
+Document editors show connection, server receipt, exact file/snapshot save and unconfirmed Git publication separately. File failure retains recovery data and offers an authorized writer retry after storage recovers; retry exhaustion is explicit. Exact-passage editing through REST/MCP tolerates unrelated typing. The built-in assistant supplies complete authorized conflict context and a bounded reconsideration budget. Strict whole-body/offset guards, permissions, private scope and publication policy remain unchanged.

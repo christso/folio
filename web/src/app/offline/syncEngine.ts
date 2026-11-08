@@ -177,12 +177,12 @@ async function flushDirtyDoc(pageId: string, kind: 'doc' | 'board'): Promise<boo
     // the server drops a viewer's updates without a word — never confirms, and
     // the copy stays for the user to see in the unsynced list.
     const confirmed = provider.wsconnected && (await ack.whenConfirmed(FLUSH_SYNC_TIMEOUT_MS)) && (!file || await file.whenConfirmed(FLUSH_SYNC_TIMEOUT_MS));
-    if (!confirmed || !provider.wsconnected) {
+    if (!confirmed || !provider.wsconnected || isSessionOpen(pageId)) {
       persistence.destroy();
       return false;
     }
     await persistence.clear();
-    markDocClean(pageId);
+    if (!isSessionOpen(pageId)) markDocClean(pageId);
     return true;
   } finally {
     file?.dispose();

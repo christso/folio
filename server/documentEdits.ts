@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { DOCUMENT_BODY_MAX_BYTES, documentBodyEditSchema } from '../shared/contracts.js';
+import { DOCUMENT_BODY_MAX_BYTES, documentBodyEditSchema, documentTextReplacementSchema } from '../shared/contracts.js';
 import { HttpError } from './errors.js';
 
 export class DocumentEditError extends HttpError {
@@ -75,4 +75,20 @@ export function planBodyEdit(id: string, before: string, input: unknown): { mark
     throw new DocumentEditError(400, 'frontmatter_not_allowed', 'Guarded edits accept the Markdown body only, without frontmatter; use the properties API for metadata.');
   }
   return { markdown, revision: bodyRevision(id, markdown), changes };
+}
+
+/** Explicit location-independent intent; never an automatic rebase of old ranges. */
+export function planTextReplacement(id: string, before: string, input: unknown): ReturnType<typeof planBodyEdit> {
+  const parsed = documentTextReplacementSchema.safeParse(input);
+  if (!parsed.success) throw new DocumentEditError(400, 'invalid_text_replacement', 'Provide nonempty oldText and newText; only those fields are allowed.');
+  const { oldText, newText } = parsed.data;
+  const from = before.indexOf(oldText);
+  if (from < 0 || before.indexOf(oldText, from + 1) >= 0) {
+    throw new DocumentEditError(409, 'quote_conflict', 'The exact quotation is missing or occurs more than once. Read the complete page and reconsider; no changes were made.');
+  }
+  const plan = planBodyEdit(id, before, { expectedRevision: bodyRevision(id, before), edits: [{ from, to: from + oldText.length, expectedText: oldText, text: newText }] });
+  if (oldText !== newText && plan.markdown.includes(oldText)) {
+    throw new DocumentEditError(409, 'quote_conflict', 'The replacement would retain or recreate its quotation. Use a strict revision-guarded edit; no changes were made.');
+  }
+  return plan;
 }

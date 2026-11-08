@@ -20,8 +20,10 @@ export function trackDocumentFileStatus(provider: WebsocketProvider, doc: Y.Doc,
   const listeners = new Set<() => void>();
   let snapshot: FileSaveSnapshot = { state: 'unconfirmed' };
   let receipt: DocumentFileStatus | undefined;
+  let lastReceiptAt = 0;
   let local: { revision: string; history: string } | undefined;
   let failed = false;
+  let hashUnavailable = false;
   let generation = 0;
   let disposed = false;
   let lastRetry = -Infinity;
@@ -33,7 +35,7 @@ export function trackDocumentFileStatus(provider: WebsocketProvider, doc: Y.Doc,
   const confirmed = () => provider.wsconnected && receipt?.state === 'saved' && local !== undefined && receipt.revision === local.revision && receipt.history === local.history;
   const recompute = () => {
     if (confirmed()) { failed = false; set('saved'); }
-    else set(failed ? 'error' : provider.wsconnected ? 'saving' : 'unconfirmed');
+    else set(failed ? 'error' : !receipt || hashUnavailable || !provider.wsconnected ? 'unconfirmed' : 'saving');
   };
   const digest = async (text: string) => {
     const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -42,6 +44,7 @@ export function trackDocumentFileStatus(provider: WebsocketProvider, doc: Y.Doc,
   const changed = () => {
     const current = ++generation;
     local = undefined;
+    hashUnavailable = false;
     recompute(); // invalidate synchronously, before asynchronous hashing
     const body = doc.getText('content').toString();
     const history = documentHistoryKey(Y.encodeStateAsUpdate(doc));
@@ -49,7 +52,7 @@ export function trackDocumentFileStatus(provider: WebsocketProvider, doc: Y.Doc,
       if (disposed || generation !== current) return;
       local = { revision: `body-v1:${revision}`, history };
       recompute();
-    }).catch(() => { if (!disposed && generation === current) set(failed ? 'error' : 'unconfirmed'); });
+    }).catch(() => { if (!disposed && generation === current) { hashUnavailable = true; recompute(); } });
   };
   const request = (action: 'status' | 'retry') => {
     if (!provider.wsconnected || provider.ws?.readyState !== 1) return;
@@ -68,6 +71,7 @@ export function trackDocumentFileStatus(provider: WebsocketProvider, doc: Y.Doc,
       const parsed = documentFileStatusSchema.safeParse(JSON.parse(raw));
       if (!parsed.success) return;
       receipt = parsed.data;
+      lastReceiptAt = Date.now();
       if (receipt.state === 'error') failed = true;
       recompute();
     } catch { /* malformed or older server: never infer a save */ }
@@ -81,7 +85,11 @@ export function trackDocumentFileStatus(provider: WebsocketProvider, doc: Y.Doc,
   doc.on('update', changed);
   changed();
   if (provider.wsconnected) request('status');
-  const probe = setInterval(() => { if (snapshot.state !== 'saved') request('status'); }, 3000);
+  const probe = setInterval(() => {
+    if (snapshot.state === 'saved') return;
+    if (receipt && Date.now() - lastReceiptAt > 10_000) { receipt = undefined; recompute(); }
+    request('status');
+  }, 3000);
   return {
     isConfirmed: () => snapshot.state === 'saved' && provider.wsconnected,
     getSnapshot: () => snapshot,

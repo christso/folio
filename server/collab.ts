@@ -51,7 +51,7 @@ import type { ExcalidrawElement, ExcalidrawScene } from './confluenceWhiteboard.
 import { trackConnection } from './liveConnections.js';
 import { documentHistoryHash } from './documentPersistence.js';
 import { DOCUMENT_FILE_STATUS_MESSAGE, DOCUMENT_FILE_REQUEST_MESSAGE, type DocumentFileStatus } from '../shared/contracts.js';
-import { bodyRevision, DocumentEditError, planBodyEdit } from './documentEdits.js';
+import { bodyRevision, DocumentEditError, planBodyEdit, planTextReplacement } from './documentEdits.js';
 import type { DocumentBodyEditResult } from '../shared/contracts.js';
 
 interface PersistenceHooks {
@@ -2716,29 +2716,41 @@ export async function readDocumentBody(id: string): Promise<{ markdown: string; 
 
 /** Authorization is the caller's responsibility. No await separates guards and mutation. */
 export async function editDocumentBody(id: string, input: unknown, author: GitIdentity): Promise<DocumentBodyEditResult> {
-  return withDocumentRoom(id, async (doc, entry) => {
-    const writer = writers.get(id);
-    const ytext = doc.getText('content');
-    const before = ytext.toString();
-    const plan = planBodyEdit(id, before, input);
-    const changed = plan.changes.length > 0;
-    if (changed) {
-      gitSync.recordEditor(entry.space, author);
-      doc.transact(() => {
-        for (const edit of [...plan.changes].reverse()) {
-          ytext.delete(edit.from, edit.to - edit.from);
-          if (edit.text) ytext.insert(edit.from, edit.text);
-        }
-      }, 'guarded-api-edit');
-      if (typeof input === 'object' && input !== null && 'markdown' in input && input.markdown !== undefined) await backupRoomText(id, 'body replaced through the guarded API', before);
-    }
-    // flushDoc alone cannot prove success: its normal retry path absorbs errors.
-    await writer?.flush();
-    if (!writer || persistSucceeded.get(doc) !== true) {
-      throw new DocumentEditError(503, 'body_persistence_failed', 'The edit may already be live, but file/snapshot persistence was not confirmed. Read back before retrying.', { acceptedRevision: plan.revision });
-    }
-    return { ...storage.toPageMeta(await storage.requireEntry(id)), revision: plan.revision, changed, persistence: 'file', publication: 'pending' };
+  return withDocumentRoom(id, (doc, entry) => {
+    const plan = planBodyEdit(id, doc.getText('content').toString(), input);
+    return persistPlannedBodyEdit(id, doc, entry, plan, author, typeof input === 'object' && input !== null && 'markdown' in input && input.markdown !== undefined);
   });
+}
+
+export async function replaceDocumentText(id: string, input: unknown, author: GitIdentity): Promise<DocumentBodyEditResult> {
+  return withDocumentRoom(id, (doc, entry) => {
+    const plan = planTextReplacement(id, doc.getText('content').toString(), input);
+    return persistPlannedBodyEdit(id, doc, entry, plan, author);
+  });
+}
+
+/** Called synchronously after planning on the same leased room. */
+async function persistPlannedBodyEdit(id: string, doc: Y.Doc, entry: storage.PageIndexEntry, plan: ReturnType<typeof planBodyEdit>, author: GitIdentity, backupReplacement = false): Promise<DocumentBodyEditResult> {
+  const writer = writers.get(id);
+  const ytext = doc.getText('content');
+  const before = ytext.toString();
+  const changed = plan.changes.length > 0;
+  if (changed) {
+    gitSync.recordEditor(entry.space, author);
+    doc.transact(() => {
+      for (const edit of [...plan.changes].reverse()) {
+        ytext.delete(edit.from, edit.to - edit.from);
+        if (edit.text) ytext.insert(edit.from, edit.text);
+      }
+    }, 'guarded-api-edit');
+    if (backupReplacement) await backupRoomText(id, 'body replaced through the guarded API', before);
+  }
+  // flushDoc alone cannot prove success: its normal retry path absorbs errors.
+  await writer?.flush();
+  if (!writer || persistSucceeded.get(doc) !== true) {
+    throw new DocumentEditError(503, 'body_persistence_failed', 'The edit may already be live, but file/snapshot persistence was not confirmed. Read back before retrying.', { acceptedRevision: plan.revision });
+  }
+  return { ...storage.toPageMeta(await storage.requireEntry(id)), revision: plan.revision, changed, persistence: 'file', publication: 'pending' };
 }
 
 /** A comment anchor on a stretch of a doc's text: base64 of two Y.encodeRelativePosition, plus the text itself (shared/comments.ts). */
@@ -3428,7 +3440,7 @@ export function attachToServer(httpServer: HttpServer): void {
             if (!subscribers.has(conn)) { subscribers.add(conn); conn.once('close', () => subscribers.delete(conn)); }
             if (request.action === 'retry' && session.roleAtLeast(role, 'editor') && Date.now() - lastFileRequest >= 1000) {
               lastFileRequest = Date.now();
-              writers.get(docName)?.schedule();
+              void writers.get(docName)?.flush().catch(err => console.error('[collab] requested file save failed:', err));
             }
             sendDocumentFileStatus(conn, room);
           } catch { /* invalid control frames never mutate the document */ }

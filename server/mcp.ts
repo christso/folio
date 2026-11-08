@@ -135,6 +135,7 @@ export const MCP_WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
   'board_ops',
   'create_page',
   'update_page',
+  'replace_page_text',
   'create_page_from_template',
   'save_page_as_template',
   'create_template',
@@ -168,7 +169,7 @@ export const FOLIO_MCP_INSTRUCTIONS = [
   '',
   'Find, then read: call list_spaces, then search_pages (full text) or list_tree (page tree) to locate a page, then read_page by id. search and fetch do the same for clients that accept only those two tool names. resolve_folio_url turns a pasted Folio link into a page id. get_backlinks, page_history and page_at_sha show links and past versions. get_page_metadata gives a page\'s outline, tags, properties and links; list_unresolved_links and list_orphans find broken links and pages nothing links to; get_graph maps how pages link (a whole space or one page\'s neighbourhood); list_tags and list_properties show the tags and property keys in use; query_base answers a base.',
   '',
-  'Write minimally: read_page first; update_page requires its revision as expectedRevision and markdown or guarded edits. Stale writes fail: reread and reconcile. Body only, LF, no frontmatter. Success confirms file persistence; Git publication is delayed. Read back after writing or a lost response. create_page for new documents (set parentPath). Before changing a data table, call folio_table_schema for exact ids and options; use folio_table_* tools. Other kinds have dedicated tools: forms, boards, bases, artifacts and templates. Page properties: set_page_properties (merge: true to change one key). Change only what was asked.',
+  'Write minimally: read_page first; replace_page_text explicitly replaces one unchanged unique passage in the current body during unrelated typing. update_page requires its revision as expectedRevision and markdown or guarded edits. Stale writes fail: reread and reconcile. Body only, LF, no frontmatter. Success confirms file persistence; Git publication is delayed. Read back after writing or a lost response. create_page for new documents (set parentPath). Before changing a data table, call folio_table_schema for exact ids and options; use folio_table_* tools. Other kinds have dedicated tools: forms, boards, bases, artifacts and templates. Page properties: set_page_properties (merge: true to change one key). Change only what was asked.',
   '',
   'Permissions: you act with the rights of the connected user, limited by the granted scope (read-only connections cannot write). If a tool reports a missing role or scope, tell the user instead of retrying.',
   '',
@@ -1133,6 +1134,29 @@ export function buildFolioMcpServer(actor: McpActor, options: { origin?: string 
       gitSync.noteActivity(space);
       recordAudit(actor.user.id, 'page.created', meta.id, { source: 'mcp', tool: 'create_template' });
       return structuredResult({ ...result, url: pageUrl(result.space, result.id) });
+    },
+  );
+
+  server.registerTool(
+    'replace_page_text',
+    {
+      outputSchema: outputSchemas.body_edit, annotations: WRITE_OVERWRITES, title: 'Replace one exact passage',
+      description: 'Replace an exact nonempty quotation wherever it occurs uniquely in the current document, preserving all other text even during typing elsewhere. This explicitly permits location-independent matching; use sufficient context and read_page first. Missing, changed, overlapping repeated or ambiguous quotation fails. The entire result must consume oldText (unless unchanged); true append uses strict update_page. No fuzzy fallback or automatic replay on transport/503 failure. Read back and reconsider. Confirms file/snapshot persistence, never publication. Requires write scope.',
+      inputSchema: { id: z.string().describe('Document page id'), oldText: z.string().min(1).max(DOCUMENT_BODY_MAX_BYTES).describe('Exact unique passage including enough context; LF only'), newText: z.string().max(DOCUMENT_BODY_MAX_BYTES).describe('Replacement passage; must consume oldText throughout resulting body, or equal it for a no-op') },
+    },
+    async ({ id, oldText, newText }) => {
+      if (!hasWriteScope) return errorResult('this action requires a token with write scope');
+      const { entry, error } = await checkPageRole(actor, id, 'editor');
+      if (error || !entry) return errorResult(error ?? 'page not found');
+      if (entry.kind !== 'doc') return errorResult('replace_page_text only supports documents');
+      try {
+        const result = await collab.replaceDocumentText(id, { oldText, newText }, { name: actor.user.name, email: actor.user.email });
+        if (result.changed) recordAudit(actor.user.id, 'page.updated', id, { source: 'mcp', tool: 'replace_page_text' });
+        return structuredResult(result);
+      } catch (err) {
+        if (err instanceof DocumentEditError) return errorResult(JSON.stringify(err.toJSON()));
+        throw err;
+      }
     },
   );
 

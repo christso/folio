@@ -20,6 +20,7 @@ import { buildFolioMcpServer } from './mcp.js';
 import { HttpError } from './errors.js';
 import { bodyRevision } from './documentEdits.js';
 import * as pageAccess from './pageAccess.js';
+import { buildAssistantTools } from './assistant/tools.js';
 import { trackDocumentFileStatus } from '../web/src/app/collabFileStatus.js';
 import type { User } from '../shared/contracts.js';
 
@@ -348,6 +349,96 @@ describe('guarded editing through actual storage, REST and MCP', () => {
     expect((await read(p.id)).markdown).toBe('# Page\n\nMCP body\n');
   });
 
+  it('offers exact quotation editing over real MCP and REST without stale offset rebasing', async () => {
+    const p = await page();
+    const stale = await read(p.id);
+    docs.get(p.id)!.getText('content').insert(0, 'Another author\n');
+    const accepted = await client.callTool({ name: 'replace_page_text', arguments: { id: p.id, oldText: 'alpha beta gamma', newText: 'alpha reviewed gamma' } });
+    expect(accepted.isError).not.toBe(true);
+    expect(accepted.structuredContent).toMatchObject({ persistence: 'file', publication: 'pending' });
+    expect((await read(p.id)).markdown).toBe('Another author\n# Page\n\nalpha reviewed gamma\n');
+    expect((await client.callTool({ name: 'replace_page_text', arguments: { id: p.id, oldText: 'alpha beta gamma', newText: 'alpha reviewed gamma' } })).isError).toBe(true);
+    expect((await call({ id: p.id, expectedRevision: stale.revision, markdown: stale.markdown })).isError).toBe(true);
+    const denied = await app.inject({ method: 'POST', url: `/api/pages/${p.id}/replace-text`, headers: { authorization: `Bearer ${readToken}` }, payload: { oldText: 'reviewed', newText: 'denied' } });
+    expect(denied.statusCode).toBe(403);
+    const rest = await app.inject({ method: 'POST', url: `/api/pages/${p.id}/replace-text`, headers: headers(), payload: { oldText: 'alpha reviewed gamma', newText: 'alpha final gamma' } });
+    expect(rest.statusCode).toBe(200); expect(rest.json()).toMatchObject({ persistence: 'file', changed: true });
+  });
+
+  it('the supported assistant rereads complete conflict context and stops both body tools at its page/run budget', async () => {
+    const p = await page();
+    const before = await read(p.id);
+    const handle = await buildAssistantTools(user, 'agent', { space, pageId: p.id, runId: 'synthetic-run', conversationId: 'synthetic-conversation' });
+    const execute = (name: string, args: Record<string, unknown>) => handle.tools[name].execute(args as never, {} as never);
+    try {
+      docs.get(p.id)!.getText('content').insert(0, 'Peer text\n');
+      const conflict = await execute('update_page', { id: p.id, expectedRevision: before.revision, markdown: 'stale' });
+      expect(conflict).toMatchObject({ isError: true });
+      expect(JSON.stringify(conflict)).toContain('reconsider_required');
+      expect(JSON.stringify(conflict)).toContain('Peer text');
+      const current = await read(p.id);
+      const reconsidered = await execute('update_page', { id: p.id, expectedRevision: current.revision, markdown: current.markdown.replace('beta', 'reviewed') });
+      expect(JSON.parse(String(reconsidered))).toMatchObject({ persistence: 'file' });
+      await execute('replace_page_text', { id: p.id, oldText: 'missing quotation', newText: 'never' });
+      const stopped = await execute('update_page', { id: p.id, expectedRevision: (await read(p.id)).revision, markdown: 'must not apply' });
+      expect(JSON.stringify(stopped)).toContain('edit_retry_budget_exhausted');
+      expect((await read(p.id)).markdown).toContain('Peer text');
+      expect((await read(p.id)).markdown).not.toContain('must not apply');
+    } finally { await handle.close(); }
+  });
+
+  it('withholds revisions from oversized assistant conflict rereads', async () => {
+    const p = await page('# Page\n\n' + 'x'.repeat(130_000));
+    const stale = await read(p.id);
+    docs.get(p.id)!.getText('content').insert(0, 'Peer\n');
+    const handle = await buildAssistantTools(user, 'agent', { space, pageId: p.id, runId: 'synthetic-run', conversationId: 'synthetic-conversation' });
+    try {
+      const result = await handle.tools.update_page.execute({ id: p.id, expectedRevision: stale.revision, markdown: 'stale' } as never, {} as never);
+      expect(JSON.stringify(result)).toContain('reconsider_read_unavailable');
+      expect(JSON.stringify(result)).not.toContain('body-v1:');
+    } finally { await handle.close(); }
+  });
+
+  it('blocks assistant replay after uncertain persistence until an explicit complete read, then confirms a no-op recovery', async () => {
+    const p = await page();
+    const handle = await buildAssistantTools(user, 'agent', { space, pageId: p.id, runId: 'synthetic-run', conversationId: 'synthetic-conversation' });
+    const args = { id: p.id, oldText: 'alpha beta gamma', newText: 'alpha accepted gamma' };
+    const write = storage.writeDocBodyIfChanged;
+    const failed = vi.spyOn(storage, 'writeDocBodyIfChanged').mockImplementation(async (...args) => { if (args[0] === p.id) throw new Error('Synthetic file failure'); return write(...args); });
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const result = await handle.tools.replace_page_text.execute(args as never, {} as never);
+      expect(JSON.stringify(result)).toContain('body_persistence_failed');
+      const replay = await handle.tools.replace_page_text.execute(args as never, {} as never);
+      expect(JSON.stringify(replay)).toContain('edit_outcome_unknown');
+    } finally { failed.mockRestore(); errors.mockRestore(); }
+    try {
+      const current = JSON.parse(String(await handle.tools.read_page.execute({ id: p.id } as never, {} as never)));
+      expect(current.markdown).toContain('alpha accepted gamma');
+      const saved = await handle.tools.update_page.execute({ id: p.id, expectedRevision: current.revision, markdown: current.markdown } as never, {} as never);
+      expect(JSON.parse(String(saved))).toMatchObject({ changed: false, persistence: 'file', publication: 'pending' });
+      expect((await read(p.id)).markdown.match(/accepted/g)).toHaveLength(1);
+    } finally { await handle.close(); }
+  });
+
+  it('stops repeated uncertain assistant saves even after explicit reads and switching body tools', async () => {
+    const p = await page();
+    const handle = await buildAssistantTools(user, 'agent', { space, pageId: p.id, runId: 'synthetic-run', conversationId: 'synthetic-conversation' });
+    const write = storage.writeDocBodyIfChanged;
+    const failed = vi.spyOn(storage, 'writeDocBodyIfChanged').mockImplementation(async (...args) => { if (args[0] === p.id) throw new Error('Synthetic file failure'); return write(...args); });
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await handle.tools.replace_page_text.execute({ id: p.id, oldText: 'alpha beta gamma', newText: 'alpha accepted gamma' } as never, {} as never);
+      const current = JSON.parse(String(await handle.tools.read_page.execute({ id: p.id } as never, {} as never)));
+      const second = await handle.tools.update_page.execute({ id: p.id, expectedRevision: current.revision, markdown: current.markdown } as never, {} as never);
+      expect(JSON.stringify(second)).toContain('body_persistence_failed');
+      await handle.tools.read_page.execute({ id: p.id } as never, {} as never);
+      const stopped = await handle.tools.replace_page_text.execute({ id: p.id, oldText: 'alpha accepted gamma', newText: 'must not apply' } as never, {} as never);
+      expect(JSON.stringify(stopped)).toContain('two uncertain outcomes');
+      expect((await read(p.id)).markdown).not.toContain('must not apply');
+    } finally { failed.mockRestore(); errors.mockRestore(); await collab.flushDoc(p.id); await handle.close(); }
+  });
+
   it('returns a complete large document and usable revision to external MCP clients', async () => {
     const p = await page('# Page\n\n' + 'x'.repeat(130_000) + '\nTail\n');
     const result = await client.callTool({ name: 'read_page', arguments: { id: p.id } });
@@ -400,16 +491,20 @@ describe('guarded editing through actual storage, REST and MCP', () => {
       });
       const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
       try {
+        collab.setPersistRetryBaseMsForTests(1);
         doc.getText('content').insert(doc.getText('content').length, 'Typed during failure\n');
         await vi.waitFor(() => expect(file.getSnapshot().state).toBe('error'));
         expect(file.isConfirmed()).toBe(false);
         expect(await storage.readFreshDocBody(p.id)).not.toContain('Typed during failure');
+        await vi.waitFor(() => expect(errors.mock.calls.some(call => String(call[0]).includes('giving up writing page ' + p.id))).toBe(true), { timeout: 20_000 });
+        expect(file.getSnapshot().state).toBe('error');
+        expect(file.isConfirmed()).toBe(false);
       } finally { failed.mockRestore(); errors.mockRestore(); }
       file.retry();
       await vi.waitFor(() => expect(file.isConfirmed()).toBe(true));
       expect(docs.get(p.id)).toBe(room);
       expect(await storage.readFreshDocBody(p.id)).toContain('Typed during failure');
-    } finally { file.dispose(); provider.destroy(); doc.destroy(); }
+    } finally { collab.setPersistRetryBaseMsForTests(2_000); file.dispose(); provider.destroy(); doc.destroy(); }
   });
 
   it('keeps bot edits and browser typing over the real collaboration socket, including a close/reopen', async () => {

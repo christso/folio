@@ -57,6 +57,36 @@ describe('document file confirmation', () => {
     await vi.waitFor(() => expect(file.isConfirmed()).toBe(true));
     undo.destroy(); file.dispose(); doc.destroy(); server.destroy();
   });
+  it('does not let a stale file receipt cover an auxiliary pure deletion with unchanged text and vector', async () => {
+    const { doc, file, status } = fixture();
+    doc.getMap('auxiliary').set('draft', 'Keep collaborative identity');
+    status('saved'); await vi.waitFor(() => expect(file.isConfirmed()).toBe(true));
+    const snapshot = Y.encodeStateAsUpdate(doc); const vector = Y.encodeStateVector(doc);
+    doc.getMap('auxiliary').delete('draft');
+    expect(Y.encodeStateVector(doc)).toEqual(vector);
+    status('saved', snapshot);
+    await new Promise(r => setTimeout(r, 20)); expect(file.isConfirmed()).toBe(false);
+    status('saved'); await vi.waitFor(() => expect(file.isConfirmed()).toBe(true));
+    file.dispose(); doc.destroy();
+  });
+  it('does not call absent or lost server confirmation an endless save in progress', async () => {
+    vi.useFakeTimers();
+    const { doc, file, status } = fixture();
+    expect(file.getSnapshot().state).toBe('unconfirmed');
+    status('saving'); expect(file.getSnapshot().state).toBe('saving');
+    try { await vi.advanceTimersByTimeAsync(12_100); expect(file.getSnapshot().state).toBe('unconfirmed'); }
+    finally { file.dispose(); doc.destroy(); vi.useRealTimers(); }
+  });
+  it('keeps verification explicitly unconfirmed when browser hashing is unavailable, including later server receipts', async () => {
+    const { doc, file, status } = fixture();
+    vi.stubGlobal('crypto', {});
+    doc.getText('content').insert(1, 'B');
+    await new Promise(r => setTimeout(r, 0)); // let the rejected digest settle
+    expect(file.getSnapshot().state).toBe('unconfirmed');
+    status('saved');
+    expect(file.getSnapshot().state).toBe('unconfirmed'); expect(file.isConfirmed()).toBe(false);
+    file.dispose(); doc.destroy();
+  });
   it('keeps failure through new typing and reconnect, then confirms only a matching recovery; retry sends no body', async () => {
     const { doc, file, status, provider, event } = fixture();
     status('error'); expect(file.getSnapshot().state).toBe('error');

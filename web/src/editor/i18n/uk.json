@@ -397,19 +397,21 @@
   },
   "fileSave": {
     "saving": "Збереження у файл…",
-    "savingHint": "Очікується підтвердження файлу та спільного знімка. З’єднання й отримання сервером є окремими станами.",
+    "savingHint": "Збереження останніх змін ще не підтверджено. З’єднання та отримання сервером показані окремо.",
     "saved": "Файл збережено",
-    "savedHint": "This document state was saved to its file and collaborative snapshot. Git publication is separate.",
+    "savedHint": "Останні зміни підтверджено як збережені у файлі документа. Публікація в Git відбувається окремо.",
     "error": "Помилка збереження файлу",
-    "errorHint": "File or snapshot persistence failed. Keep this tab open or export a copy. Your text has not been replaced; the server will retry.",
+    "errorHint": "Не вдалося підтвердити збереження останніх змін. Автоматичні повторні спроби обмежені. Залиште вкладку відкритою або експортуйте копію.",
     "offline": "Офлайн — збереження не підтверджено",
-    "offlineHint": "Edits stay on this device until connection and file persistence are confirmed.",
+    "offlineHint": "Зміни залишаються на цьому пристрої, доки з’єднання та збереження у файл не буде підтверджено.",
     "unreceived": "Очікування підтвердження сервера",
-    "unreceivedHint": "The server has not confirmed receiving your latest changes.",
+    "unreceivedHint": "Сервер ще не підтвердив отримання останніх змін.",
     "unconfirmed": "Збереження файлу не підтверджено",
-    "unconfirmedHint": "No current file/snapshot confirmation is available. Keep this tab open or export a copy.",
+    "unconfirmedHint": "Поточне підтвердження збереження недоступне. Залиште вкладку відкритою або експортуйте копію.",
     "retry": "Повторити збереження",
     "publication": "Публікацію в Git не підтверджено",
-    "received": "Отримано сервером"
+    "received": "Отримано сервером",
+    "retryHint": "Після відновлення сховища натисніть «Повторити збереження».",
+    "viewerHint": "Після відновлення сховища попросіть редактора повторити збереження файлу."
   }
 }

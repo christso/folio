@@ -13,6 +13,10 @@ forms and bases. These are the same tools that are registered in `server/mcp.ts`
 token — the built-in chat gets them in-process, with the rights and the
 audit of the current user of the session, without a separate token.
 
+## Guarded passage changes
+
+For a passage replacement that should tolerate typing elsewhere, use `replace_page_text(id, oldText, newText)` after reading. It replaces exactly one unchanged unique quotation wherever it occurs in this page; include enough context. A changed result must consume the quotation entirely; missing/ambiguous/recreated quotations stop. Keep true appends and whole/offset edits on strict `update_page`. On conflicts reread and reconsider, at most two conflicts per page in one task before asking for a quiet moment. A lost response or persistence failure is uncertain: read explicitly before any further write; never silently replay. Stop after two uncertain write outcomes in the same page/task even if reads interleave. The built-in assistant enforces this budget in code; other clients must enforce their own bound.
+
 ## The order of work
 
 1. Find the entity: `search_pages` or `list_tree` — do not guess the `id` of

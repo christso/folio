@@ -63,11 +63,11 @@ describe('server/mcp.ts — server identity', () => {
 describe('server/mcp.ts — tool annotations and instructions', () => {
   const actor: McpActor = { user: { id: 'nobody' } as User, scopes: ['read'], tokenId: 'test-annotations-token' };
 
-  it('annotates all 49 tools: a title, explicit booleans, and readOnlyHint or destructiveHint', async () => {
+  it('annotates all 50 tools: a title, explicit booleans, and readOnlyHint or destructiveHint', async () => {
     const { client, close } = await connectedClient(actor);
     try {
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(49);
+      expect(tools).toHaveLength(50);
       for (const tool of tools) {
         const a = tool.annotations;
         expect(a?.title ?? tool.title, `${tool.name} title`).toBeTruthy();
@@ -119,7 +119,7 @@ describe('server/mcp.ts — tool annotations and instructions', () => {
         [
           'add_comment', 'board_ops', 'convert_canvas_to_board', 'create_board', 'create_form', 'create_page', 'create_page_from_template', 'create_template', 'folio_table_add_column', 'folio_table_create', 'folio_table_delete',
           'folio_table_delete_column', 'folio_table_delete_view', 'folio_table_insert', 'folio_table_save_view', 'folio_table_update', 'folio_table_update_column', 'publish_artifact', 'rename_tag',
-          'reply_comment', 'save_base', 'save_page_as_template', 'set_page_properties', 'update_board', 'update_form', 'update_page',
+          'replace_page_text', 'reply_comment', 'save_base', 'save_page_as_template', 'set_page_properties', 'update_board', 'update_form', 'update_page',
         ],
       );
       // The public demo's write limit (demoLimits.ts) counts exactly these names: a new write tool must be added to the list.

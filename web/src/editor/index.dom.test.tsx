@@ -662,6 +662,20 @@ describe('PageEditor connection dot', () => {
 });
 
 describe('document file-save clarity', () => {
+  it('shows unconfirmed verification honestly even when connected and received', () => {
+    const doc = new Y.Doc(); const snapshot = { state: 'unconfirmed' };
+    collab.session = { doc, ytext: doc.getText('content'), provider: { awareness: new Awareness(doc) }, file: { getSnapshot: () => snapshot, subscribe: () => () => {} }, ack: { isConfirmed: () => true, subscribe: () => () => {} } };
+    const container = mount();
+    expect(container.querySelector('[data-file-state="unconfirmed"]')?.textContent).toContain('File save unconfirmed');
+    expect(container.textContent).not.toContain('Saving to file');
+  });
+  it('gives readers recovery guidance without offering an unauthorized retry control', () => {
+    const doc = new Y.Doc(); const snapshot = { state: 'error' };
+    collab.session = { doc, ytext: doc.getText('content'), provider: { awareness: new Awareness(doc) }, file: { getSnapshot: () => snapshot, subscribe: () => () => {} }, ack: { isConfirmed: () => true, subscribe: () => () => {} } };
+    const container = mount({ readOnly: true });
+    expect(container.querySelector('[role=alert]')?.textContent).toContain('Ask an editor');
+    expect(container.querySelector('[data-file-state=error] button')).toBeNull();
+  });
   it('shows a storage failure despite connection and receipt, and retries without changing text', () => {
     const retry = vi.fn();
     const fileSnapshot = { state: 'error' };
@@ -672,6 +686,9 @@ describe('document file-save clarity', () => {
     expect(save.textContent).toContain('File save failed');
     expect(save.textContent).toContain('Received by server');
     expect(save.textContent).toContain('Git publication not confirmed');
+    expect(container.querySelector('[role=alert]')?.textContent).toContain('Automatic retries are limited');
+    expect(container.querySelector('[role=alert]')?.textContent).toContain('Keep this tab open or export a copy');
+    expect(container.textContent).not.toContain('the server will retry');
     act(() => (save.querySelector('button') as HTMLButtonElement).click());
     expect(retry).toHaveBeenCalledOnce();
   });
