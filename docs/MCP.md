@@ -84,6 +84,7 @@ Clients are public (no client secret). Redirect URIs must be `https`, or `http` 
 | Artifacts (scope `write`) | `publish_artifact` (read an artifact with `read_page`) |
 | Templates | `list_templates` |
 | Writing rules | `check_page_writing_rules` |
+| Team skills | `list_skills`, `get_skill` |
 | Comments | `list_comments` |
 | Comments (scope `write`) | `add_comment`, `reply_comment` |
 | Templates (scope `write`) | `create_page_from_template`, `save_page_as_template`, `create_template` |
@@ -93,7 +94,11 @@ Clients are public (no client secret). Redirect URIs must be `https`, or `http` 
 | Data tables (scope `write`) | `folio_table_insert`, `folio_table_update`, `folio_table_delete`, `folio_table_add_column`, `folio_table_update_column`, `folio_table_delete_column`, `folio_table_save_view`, `folio_table_delete_view`, `folio_table_create` |
 | Forms (scope `write`) | `create_form`, `update_form` (read a form with `read_page`) |
 
-50 tools: 23 read-only, 27 that write.
+52 tools: 25 read-only, 27 that write.
+
+**Review mode.** If a space admin has set **AI agents** to **Send edits for review**, `update_page`, `create_page` and `PUT /api/pages/:id` with an API token return a proposal instead of changing the page; an editor or admin accepts it in the **On review** list. Only Markdown pages are covered: while the mode is on, the tools for boards, tables, forms, bases, properties, tags and artifacts are refused for that space. `add_comment` and `reply_comment` are not queued. `git push` is not intercepted. `add_comment` also takes `elementId` (a whiteboard element) or `rowId` and `columnId` (a table cell). `read_page` and `fetch` return a `verification` block (owner, verified date, review date and state) for a page that has these properties.
+
+**Team skills.** A skill is an ordinary document page tagged `skill`; its name is the page title and its short description the front matter `description`. `list_skills()` returns `{"skills": [{name, description, id, space, path, updatedAt}]}` for the skills you can open (up to 100); `get_skill(skill)` takes a name or a page id and returns the same fields plus `markdown`, the page text. The list is read from the page index on every call, so a page tagged in the browser is there on the next call. Both tools only read, follow the page access rules and are refused on public sites. A page whose title equals the name of a skill built into Folio's own assistant is not listed. The server also offers each skill as an MCP prompt (name: the title in lower case with dashes); it uses the same list, so prompts follow your rights too. Folio does not offer MCP resources. How a client shows prompts differs from client to client; the tools work everywhere. See [Team skills](TEAM-SKILLS.md).
 
 **Comments.** `list_comments(page, status?)` returns a document's inline comment threads (`id`, quoted text, `status` open or resolved, the comments oldest first) and whether you may reply; `add_comment(page, quote, body)` starts a thread on the first occurrence of `quote` in the page's current Markdown (copy it exactly from `read_page`; an error when it is not found); `reply_comment(threadId, body)` answers a thread. The author is the token's owner. Comments are not part of the page's Markdown or Git. Refused on public sites.
 
@@ -240,6 +245,23 @@ document (`kind` omitted or `"doc"`) and writes it right after creating the
 page, and an optional `columns` for `kind: "table"`, where `markdown` is
 ignored. It cannot create a whiteboard: use `create_board`. To change the text
 of an existing page, read it first, then use guarded `update_page` over MCP or `PUT /api/pages/:id`.
+
+**Replacing a page safely.** `read_page` and REST document GET return both
+`revision` (the fork's page-bound revision) and upstream's `bodyRevision`.
+Use `expectedRevision` with a replacement or exact ranges. Upstream clients
+may instead send `bodyRevision` as `baseRevision`; it is checked on the same
+restored room through the fork's strict body validation and persistence path.
+If both revisions are supplied, both must match. MCP and API-token writes
+without either revision are refused. Cookie-only REST replacements retain
+legacy unguarded behavior unless a revision is supplied. Revisions guard
+server-received text, not keystrokes still waiting on a client.
+
+In review mode, guarded replacements and ranges create a proposal instead of
+mutating the page. The response has `status: "proposed"` and `proposalId`, not
+file/publication confirmation. `replace_page_text` and its token-authenticated
+REST equivalent are refused in review mode; use guarded `update_page` to
+propose a passage change. The optional location precondition and authorization
+recheck also apply to proposals.
 
 **A page's title is the first `# H1` of its text.** So when `create_page`
 gets a `markdown` that does not open with an H1, it puts `# <title>` above it

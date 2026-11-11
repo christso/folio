@@ -9,11 +9,13 @@ import { useApiErrorText } from '../errorText';
 import { useLocalStorage, useOutsideClick } from '../hooks';
 import { PropertiesSlotContext } from '../header/propertiesSlot';
 import { useToast } from '../ui/Toast';
+import { VERIFICATION_KEYS } from '@shared/verification';
 import { AddPropertyForm } from './AddPropertyForm';
 import type { NewProperty } from './AddPropertyForm';
 import { PropertyRow } from './PropertyRow';
 import { countProperties, effectiveType, emptyValueFor } from './propertyValues';
 import { usePageProperties } from './usePageProperties';
+import { VerificationRows } from './VerificationRows';
 import '../i18n/register';
 
 export interface PropertiesPanelProps {
@@ -59,9 +61,21 @@ export interface PropertiesHalfProps extends PropertiesPanelProps {
   open: boolean;
   /**
    * 'column' (default): centred like the editor's text column (a document). 'popover': fills the popover it sits
-   * in (PagePropertiesPopover — tables, forms, boards, files).
+   * in (PagePropertiesPopover — tables, forms, boards, files). 'title': inside the text column, under the page
+   * title (PageTitleProperties) — no centring of its own and no inner scroll, the page scrolls.
    */
-  layout?: 'column' | 'popover';
+  layout?: 'column' | 'popover' | 'title';
+  /** Changing it to a new non-zero value opens "Add property" (the ghost button under the title asked for it). */
+  addSignal?: number;
+  /** "Add property" was closed (or the new row dropped) while the page still has no properties. */
+  onEmptyDone?: () => void;
+  /**
+   * Owner and review live in this section as their own rows (owner, verified, review_by -> VerificationRows) instead of
+   * three plain ones. Set by PageTitleProperties only: the popover of tables and files has no owner / review UI.
+   */
+  withVerification?: boolean;
+  /** Changing it to a new non-zero value shows the owner / review rows on a page that has none yet ("Owner and review" ghost). */
+  assignSignal?: number;
 }
 
 export function propertiesBodyId(pageId: string): string {
@@ -71,11 +85,12 @@ export function propertiesBodyId(pageId: string): string {
 export interface PropertiesToggleProps extends Omit<PropertiesHalfProps, 'canManageTypes' | 'layout'> {
   onToggle: () => void;
   /**
-   * 'chrome' (default): the editor's chrome row, text-xs. 'header': the shell's top bar, after the breadcrumbs — the
+   * 'chrome' (default): a row of chrome, 13px. 'header': the shell's top bar, after the breadcrumbs — the
    * label is the header's own muted text size and shrinks to an icon with the count on a narrow screen, so it never
-   * wraps the header or pushes the action icons.
+   * wraps the header or pushes the action icons. 'title': under the page title, as faint as the ghost "+ Property"
+   * it replaces once there are properties.
    */
-  variant?: 'chrome' | 'header';
+  variant?: 'chrome' | 'header' | 'title';
   buttonRef?: Ref<HTMLButtonElement>;
 }
 
@@ -115,6 +130,21 @@ export function PropertiesToggle({ pageId, space, canEdit, open, onToggle, varia
       </button>
     );
   }
+  if (variant === 'title') {
+    return (
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-expanded={open}
+        aria-controls={propertiesBodyId(pageId)}
+        onClick={onToggle}
+        className={TITLE_BUTTON}
+      >
+        <ChevronRight size={13} className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
+        <span className="truncate">{label}</span>
+      </button>
+    );
+  }
   return (
     <button
       ref={buttonRef}
@@ -122,16 +152,16 @@ export function PropertiesToggle({ pageId, space, canEdit, open, onToggle, varia
       aria-expanded={open}
       aria-controls={propertiesBodyId(pageId)}
       onClick={onToggle}
-      className="ph-mask flex min-w-0 max-w-full items-center gap-1 rounded py-1 text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+      className="ph-mask flex min-w-0 max-w-full items-center gap-1 rounded py-1 text-[13px] text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
     >
-      <ChevronRight size={13} className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
+      <ChevronRight size={14} className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
       <span className="truncate">{label}</span>
     </button>
   );
 }
 
 /** The editors, shown under the chrome row while the toggle is open. */
-export function PropertiesBody({ pageId, space, canEdit, canManageTypes, open, layout = 'column' }: PropertiesHalfProps) {
+export function PropertiesBody({ pageId, space, canEdit, canManageTypes, open, layout = 'column', addSignal = 0, onEmptyDone, withVerification = false, assignSignal = 0 }: PropertiesHalfProps) {
   const { t } = useTranslation('app');
   const errorText = useApiErrorText();
   const showToast = useToast();
@@ -139,12 +169,20 @@ export function PropertiesBody({ pageId, space, canEdit, canManageTypes, open, l
   const { state, data, visible } = useView(pageId, space, canEdit);
   const [draft, setDraft] = useState<NewProperty | null>(null);
   const [adding, setAdding] = useState(false);
+  const [assigning, setAssigning] = useState(false);
   // The row whose field has focus, and the last value/type each row showed: a property another user removes while it
   // is being edited here stays on screen (saying so) instead of vanishing under the caret (propertiesLive.ts).
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const lastSeen = useRef(new Map<string, { value: unknown; type: ReturnType<typeof effectiveType> }>());
 
   const editable = canEdit && data?.canEdit !== false && !state.conflict;
+
+  useEffect(() => {
+    if (addSignal > 0) setAdding(true);
+  }, [addSignal]);
+  useEffect(() => {
+    if (assignSignal > 0) setAssigning(true);
+  }, [assignSignal]);
 
   const saveTypes = useMutation({
     mutationFn: async (property: NewProperty) => {
@@ -163,8 +201,10 @@ export function PropertiesBody({ pageId, space, canEdit, canManageTypes, open, l
 
   const readOnlyKeys = data.readOnly;
   const keys = Object.keys(state.properties);
-  const visibleKeys = keys.filter((key) => !readOnlyKeys.includes(key));
-  const lockedKeys = keys.filter((key) => readOnlyKeys.includes(key));
+  const ownKeys = withVerification ? keys.filter((key) => !(VERIFICATION_KEYS as readonly string[]).includes(key)) : keys;
+  const hasVerificationKeys = ownKeys.length !== keys.length;
+  const visibleKeys = ownKeys.filter((key) => !readOnlyKeys.includes(key));
+  const lockedKeys = ownKeys.filter((key) => readOnlyKeys.includes(key));
   const removedKey =
     editingKey !== null && !(editingKey in state.properties) && lastSeen.current.has(editingKey) && !(draft && draft.key === editingKey) ? editingKey : null;
   const listedKeys = removedKey !== null ? [...visibleKeys, removedKey] : visibleKeys;
@@ -202,8 +242,11 @@ export function PropertiesBody({ pageId, space, canEdit, canManageTypes, open, l
 
   return (
     <section aria-label={t('properties.label')} className="ph-mask shrink-0" onFocus={(e) => trackFocus(e, true)} onBlur={(e) => trackFocus(e, false)}>
-      <div className={layout === 'popover' ? '' : 'folio-props-body'}>
-        <div id={propertiesBodyId(pageId)} className={layout === 'popover' ? 'max-h-[min(60vh,32rem)] overflow-y-auto' : 'max-h-[45vh] overflow-y-auto pb-2'}>
+      <div className={layout === 'column' ? 'folio-props-body' : ''}>
+        <div
+          id={propertiesBodyId(pageId)}
+          className={layout === 'popover' ? 'max-h-[min(60vh,32rem)] overflow-y-auto' : layout === 'title' ? 'pt-0.5' : 'max-h-[45vh] overflow-y-auto pb-2'}
+        >
             {state.conflict && (
               <div role="alert" className="mb-2 flex flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                 <TriangleAlert size={14} className="shrink-0" aria-hidden="true" />
@@ -217,6 +260,8 @@ export function PropertiesBody({ pageId, space, canEdit, canManageTypes, open, l
                 </button>
               </div>
             )}
+
+            {withVerification && <VerificationRows space={space} pageId={pageId} editable={editable} forceShow={assigning} />}
 
             {/* One keyed list for stored rows and the row being added: the new row keeps its place (and the caret) once its first value is saved. */}
             {rowKeys.map((key) => (
@@ -241,11 +286,14 @@ export function PropertiesBody({ pageId, space, canEdit, canManageTypes, open, l
                 removedRemotely={key === removedKey}
                 onCommit={(k, v) => void handleCommit(k, v)}
                 onRemove={handleRemove}
-                onCancelDraft={() => setDraft(null)}
+                onCancelDraft={() => {
+                  setDraft(null);
+                  if (visibleKeys.length === 0) onEmptyDone?.();
+                }}
               />
             ))}
 
-            {visibleKeys.length === 0 && !draft && <p className="px-1.5 py-1 text-sm text-neutral-400">{t('properties.empty')}</p>}
+            {visibleKeys.length === 0 && !draft && !(layout === 'title' && adding) && !hasVerificationKeys && !assigning && <p className="px-1.5 py-1 text-sm text-neutral-400">{t('properties.empty')}</p>}
 
             {lockedKeys.map((key) => (
               <PropertyRow
@@ -261,6 +309,17 @@ export function PropertiesBody({ pageId, space, canEdit, canManageTypes, open, l
               />
             ))}
 
+            {editable && withVerification && !hasVerificationKeys && !assigning && !adding && (
+              <button
+                type="button"
+                onClick={() => setAssigning(true)}
+                className="mt-1 flex items-center gap-1.5 rounded px-1.5 py-1 text-sm text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+              >
+                <Plus size={13} aria-hidden="true" />
+                {t('verification.assign')}
+              </button>
+            )}
+
             {editable &&
               (adding ? (
                 <AddPropertyForm
@@ -268,7 +327,10 @@ export function PropertiesBody({ pageId, space, canEdit, canManageTypes, open, l
                   existingKeys={keys}
                   canManageTypes={canManageTypes}
                   onAdd={handleAdd}
-                  onClose={() => setAdding(false)}
+                  onClose={() => {
+                    setAdding(false);
+                    if (visibleKeys.length === 0 && !draft) onEmptyDone?.();
+                  }}
                 />
               ) : (
                 <button
@@ -283,6 +345,120 @@ export function PropertiesBody({ pageId, space, canEdit, canManageTypes, open, l
         </div>
       </div>
     </section>
+  );
+}
+
+/** The faint 24px buttons under the page title: the ghost "+ Property" and the "Properties (3)" toggle. */
+const TITLE_BUTTON =
+  'ph-mask -ml-1.5 inline-flex h-6 min-w-0 max-w-full items-center gap-1 rounded-md pl-1.5 pr-2 text-[12.5px] text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300';
+
+/** Pages whose next mount in an editing mode opens "Add property" at once: the ghost was clicked in reading mode. */
+const addWhenEditing = new Set<string>();
+
+export interface PageTitlePropertiesProps extends PropertiesPanelProps {
+  /** Reading mode for someone who may edit: the ghost "+ Property" switches to Live edit and opens "Add property" there. */
+  onStartEditing?: () => void;
+}
+
+/**
+ * A document's properties under its title (owner, 07.11.2026 — out of the chrome row, Notion-like). With none, a
+ * faint "+ Property" for whoever may add one (a viewer sees nothing); clicking it opens "Add property" right there —
+ * from reading mode it first switches to Live edit, since reading is reading. With some, the "Properties (3)"
+ * toggle, its open state remembered per space (usePropertiesOpen) as in the old chrome-row toggle.
+ */
+export function PageTitleProperties({ pageId, space, canEdit, canManageTypes, onStartEditing }: PageTitlePropertiesProps) {
+  const { t } = useTranslation('app');
+  const [open, setOpen] = usePropertiesOpen(space);
+  const { data, count } = useView(pageId, space, canEdit);
+  // Adding the first property: the body is open although the remembered state may say closed.
+  const [adding, setAdding] = useState(false);
+  const [addSignal, setAddSignal] = useState(0);
+  const [assignSignal, setAssignSignal] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  function startAdding() {
+    setOpen(true);
+    setAdding(true);
+    setAddSignal((n) => n + 1);
+  }
+
+  function startAssigning() {
+    setOpen(true);
+    setAdding(true);
+    setAssignSignal((n) => n + 1);
+  }
+
+  // Arrived from the reading-mode ghost: open the form, and take focus once the editor has drawn this slot (the
+  // CodeMirror view mounts after us and focuses itself, so the form's autoFocus alone loses).
+  useEffect(() => {
+    if (!canEdit || !addWhenEditing.delete(pageId)) return;
+    startAdding();
+    const timer = setTimeout(() => rootRef.current?.querySelector<HTMLInputElement>('input')?.focus(), 60);
+    return () => clearTimeout(timer);
+    // On mount (and when editing becomes possible) only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit, pageId]);
+
+  const empty = count === 0;
+  // Once the first property is in, the remembered open state takes over again.
+  useEffect(() => {
+    if (!empty) setAdding(false);
+  }, [empty]);
+
+  if (!data) return null;
+  const mayAdd = canEdit || onStartEditing !== undefined;
+  if (empty && !adding && !mayAdd) return null;
+
+  const ghost = (
+    <button
+      type="button"
+      className={TITLE_BUTTON}
+      aria-label={t('properties.add')}
+      onClick={() => {
+        if (canEdit) startAdding();
+        else if (onStartEditing) {
+          addWhenEditing.add(pageId);
+          onStartEditing();
+        }
+      }}
+    >
+      <Plus size={13} className="shrink-0" aria-hidden="true" />
+      <span className="truncate">{t('properties.addShort')}</span>
+    </button>
+  );
+  // Only for someone who may edit right now (Live / Source): reading mode shows, never sets, an owner.
+  const assignGhost = canEdit && (
+    <button type="button" className={TITLE_BUTTON} onClick={startAssigning}>
+      <Plus size={13} className="shrink-0" aria-hidden="true" />
+      <span className="truncate">{t('verification.assign')}</span>
+    </button>
+  );
+
+  return (
+    <div ref={rootRef} className="folio-title-props" data-empty={empty ? '' : undefined}>
+      {empty ? (
+        !adding && (
+          <div className="flex flex-wrap items-center gap-x-1">
+            {ghost}
+            {assignGhost}
+          </div>
+        )
+      ) : (
+        <PropertiesToggle pageId={pageId} space={space} canEdit={canEdit} open={open} onToggle={() => setOpen((v) => !v)} variant="title" />
+      )}
+      <PropertiesBody
+        pageId={pageId}
+        space={space}
+        canEdit={canEdit}
+        canManageTypes={canManageTypes}
+        open={empty ? adding : open}
+        layout="title"
+        withVerification
+        addSignal={addSignal}
+        assignSignal={assignSignal}
+        onEmptyDone={() => setAdding(false)}
+      />
+    </div>
   );
 }
 

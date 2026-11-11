@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { AgentWriteMode } from './proposals.js';
 
 /** Server port. Vite dev server (4871) proxies /api, /files and /collab here. */
 export const SERVER_PORT = 4870;
@@ -129,8 +130,42 @@ export const pageMetaSchema = z.object({
   icon: z.string().optional(),
   /** The URL of the cover from the frontmatter `cover:` (round 5). */
   cover: z.string().optional(),
+  /**
+   * Owner, verification date and review deadline with the computed state
+   * (shared/verification.ts). Present only on a page that has any of the three
+   * properties `owner`, `verified`, `review_by`.
+   */
+  verification: z
+    .object({
+      state: z.enum(['unverified', 'verified', 'changed', 'overdue']),
+      owner: z.string().optional(),
+      verified: z.string().optional(),
+      reviewBy: z.string().optional(),
+      daysOverdue: z.number().optional(),
+      invalid: z.array(z.enum(['verified', 'review_by'])).optional(),
+    })
+    .optional(),
 });
 export type PageMeta = z.infer<typeof pageMetaSchema>;
+
+/**
+ * PUT /api/pages/:id/verification (editor+): the owner / deadline fields and the
+ * "Mark as verified" button. Every field is optional; `null` removes the value.
+ * `markVerified` stamps `verified` with today and sets `review_by` to today plus
+ * `reviewDays` (default: the page's previous period, else 90).
+ */
+export const updateVerificationBodySchema = z.object({
+  owner: z.string().max(100).nullable().optional(),
+  reviewBy: z.string().max(40).nullable().optional(),
+  markVerified: z.boolean().optional(),
+  reviewDays: z.number().int().min(1).max(3650).optional(),
+});
+export type UpdateVerificationBody = z.infer<typeof updateVerificationBodySchema>;
+/** The answer: whether the file changed, and the page's verification state after. */
+export interface VerificationResponse {
+  written: boolean;
+  verification: PageMeta['verification'] | null;
+}
 
 export interface TreeNode extends PageMeta {
   children: TreeNode[];
@@ -146,6 +181,8 @@ export interface TreeNode extends PageMeta {
 export const pageDocSchema = pageMetaSchema.extend({
   markdown: z.string().optional(),
   revision: z.string().optional(),
+  /** Docs: opaque revision of `markdown`; send it back as `baseRevision` in PUT to refuse the write if the body changed meanwhile. */
+  bodyRevision: z.string().optional(),
   svg: z.string().optional(),
   /**
    * A doc of a light-footprint space (a repository sub-folder with rootPath
@@ -229,6 +266,8 @@ export interface SpaceInfo {
    * client having to re-derive admin-ness itself.
    */
   agentRules?: { used: boolean; pages: number; path?: string; writingRules?: boolean };
+  /** Migration 062: 'direct' (agents write at once) or 'review' (their Markdown edits wait for an editor). Absent means direct. */
+  agentWriteMode?: AgentWriteMode;
 }
 
 // ---------- scan settings (Obsidian vault compatibility, wave 1a) ----------
@@ -1340,6 +1379,8 @@ export const updatePageBodySchema = z.object({
    *  an absent field leaves it alone (an ordinary text edit erases nothing). */
   icon: z.string().nullable().optional(),
   cover: z.string().nullable().optional(),
+  /** Docs, with `markdown`: the `bodyRevision` the caller read. A mismatch refuses the write with 409 `revision_conflict`. API tokens still require a revision in this fork. */
+  baseRevision: z.string().optional(),
 });
 export type UpdatePageBody = z.infer<typeof updatePageBodySchema>;
 
@@ -2516,6 +2557,25 @@ export interface TableDoc {
 export type AssistantKeySource = 'personal' | 'space' | 'instance' | 'environment' | 'none';
 export type AssistantRunMode = 'ask' | 'agent';
 
+export const ASSISTANT_PROVIDER_IDS = ['cursor', 'anthropic', 'minimax', 'codex'] as const;
+export type AssistantProviderId = (typeof ASSISTANT_PROVIDER_IDS)[number];
+/** The providers kept in `assistant_provider_credentials`; Cursor has its own columns and routes. */
+export type AssistantCredentialProviderId = Exclude<AssistantProviderId, 'cursor'>;
+
+/**
+ * One provider in GET /api/assistant/settings. `source` and `keyName` describe
+ * the credential a run of this user would use; `shareable` is false for a
+ * provider that can only ever be connected personally (Codex).
+ */
+export interface AssistantProviderStatus {
+  id: AssistantProviderId;
+  label: string;
+  connected: boolean;
+  source: AssistantKeySource;
+  keyName: string | null;
+  shareable: boolean;
+}
+
 /**
  * GET /api/assistant/settings?space=<slug> — `space` is optional: the slug of the space
  * the chat is opened in, so `apiKeySource` can report that space's shared key.
@@ -2537,8 +2597,14 @@ export interface AssistantSettings {
   personalKeysAllowed: boolean;
   /** FOLIO_SECRET is configured — the key can be saved encrypted. */
   encryptionAvailable: boolean;
-  /** Node >= 22.13 — the Cursor SDK can be loaded. */
+  /** The route this user's runs would take can actually run on this server. For a Cursor route it is `cursorRuntimeAvailable`; the other providers need no Cursor runtime. */
   runtimeAvailable: boolean;
+  /** Node >= 22.13 — the Cursor SDK can be loaded. */
+  cursorRuntimeAvailable: boolean;
+  /** The provider of the resolved route; null when no credential resolves. */
+  routeProvider: AssistantProviderId | null;
+  /** One entry per provider, connected or not. */
+  providers: AssistantProviderStatus[];
 }
 
 /** PUT /api/assistant/settings/key — checks the key with Cursor and saves it encrypted. */
@@ -2582,6 +2648,44 @@ export const saveSharedAssistantKeyBodySchema = saveAssistantKeyBodySchema;
 export const updateAssistantKeyPolicyBodySchema = z.object({ personalKeysAllowed: z.boolean() });
 export type UpdateAssistantKeyPolicyBody = z.infer<typeof updateAssistantKeyPolicyBodySchema>;
 
+// ---------- Keys of the other providers (MiniMax, Anthropic API), 09.11.2026 ----------
+// PUT|DELETE /api/assistant/settings/providers/:provider/key (personal),
+// POST /api/assistant/settings/providers/:provider/check,
+// GET|PUT|DELETE /api/admin/assistant/providers/:provider/key (instance admin),
+// GET|PUT|DELETE /api/spaces/:space/assistant-providers/:provider/key (space admin).
+// Cookie-only, verified with the provider before saving, stored encrypted and
+// never returned. Codex has no key routes of its own: its login flow is separate,
+// and it can never be shared.
+
+/** PUT .../providers/:provider/key. `label` is an optional name to recognise the key by. */
+export const saveAssistantProviderKeyBodySchema = saveAssistantKeyBodySchema.extend({ label: z.string().trim().min(1).max(200).optional() });
+export type SaveAssistantProviderKeyBody = z.infer<typeof saveAssistantProviderKeyBodySchema>;
+
+/**
+ * Device-code sign-in with a personal ChatGPT subscription.
+ * POST|GET|DELETE /api/assistant/settings/providers/codex/login
+ */
+export interface AssistantCodexLoginState {
+  status: 'idle' | 'pending' | 'connected' | 'failed';
+  verificationUrl?: string;
+  userCode?: string;
+  expiresAt?: string;
+  error?: string;
+}
+
+/** GET|PUT .../providers/:provider/key on the instance and space routes. */
+export interface AssistantProviderKeyInfo {
+  provider: AssistantCredentialProviderId;
+  scope: SharedAssistantKeyScope;
+  /** Space slug for `space`, null for `instance`. */
+  space: string | null;
+  configured: boolean;
+  keyName: string | null;
+  updatedAt: string | null;
+  updatedBy: { id: string; name: string } | null;
+  encryptionAvailable: boolean;
+}
+
 /** POST /api/assistant/settings/check (body `{apiKey?}`; without it the saved key is checked). */
 export interface AssistantConnectionCheck {
   ok: boolean;
@@ -2589,9 +2693,12 @@ export interface AssistantConnectionCheck {
 }
 
 export interface AssistantModelOption {
+  /** 'auto', a bare Cursor model id, or `<provider>:<id>` for the other providers. */
   id: string;
   label: string;
   description: string | null;
+  /** Absent on `auto`. */
+  provider?: AssistantProviderId;
 }
 /** GET /api/assistant/models — always has `auto` first. */
 export interface AssistantModelsResponse {
@@ -2946,7 +3053,15 @@ export interface AdminAssistantUnansweredResponse extends AdminAssistantFilterOp
  * adding an @ mention or a reply in a comment is an extension of the list,
  * not a rework of the table and of the whole client.
  */
-export const notificationKindSchema = z.enum(['access_request', 'access_decision']);
+export const notificationKindSchema = z.enum([
+  'access_request',
+  'access_decision',
+  'comment_mention',
+  'comment_reply',
+  'proposal_pending',
+  'proposal_decided',
+  'review_due',
+]);
 export type NotificationKind = z.infer<typeof notificationKindSchema>;
 
 export type AccessRequestStatus = 'pending' | 'approved' | 'denied';
@@ -2978,13 +3093,34 @@ export interface AccessRequestSummary {
   grantedRole?: SpaceRole | null;
 }
 
+/** The kinds that are about a page (everything except the two access-request kinds). */
+export type PageNotificationKind = Exclude<NotificationKind, 'access_request' | 'access_decision'>;
+
+/**
+ * What a page notification needs to be drawn without a join. A snapshot taken
+ * at delivery; `commentId` is what makes a comment notification deliver once.
+ */
+export interface NotificationPayload {
+  space?: string;
+  pageTitle?: string;
+  threadId?: string;
+  commentId?: string;
+  authorId?: string;
+  authorName?: string;
+  excerpt?: string;
+  [key: string]: unknown;
+}
+
 export interface NotificationItem {
   id: string;
   kind: NotificationKind;
   createdAt: string;
   readAt: string | null;
-  /** For both current kinds it is the same request: the administrator sees the request, the requester sees the decision. */
-  accessRequest: AccessRequestSummary;
+  /** For the two access kinds it is the same request: the administrator sees the request, the requester sees the decision. Absent for page kinds. */
+  accessRequest?: AccessRequestSummary;
+  /** Page kinds: the page the row is about, and its snapshot. */
+  pageId?: string | null;
+  payload?: NotificationPayload;
 }
 
 /** GET /api/notifications */

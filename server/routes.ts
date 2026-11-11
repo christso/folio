@@ -103,6 +103,8 @@ import { resolveTextLanguage } from './serverText.js';
 import { createStarterWritingRules } from './writingRules.js';
 import { parseBody, queryString } from './validate.js';
 import * as session from './auth/session.js';
+import * as proposals from './proposals.js';
+import type { ProposedResult } from '../shared/proposals.js';
 import { assertDemoAgentRootIntact, assertNotDemo, assertNotDemoAccount } from './demo.js';
 import * as authStore from './auth/store.js';
 import { hashPassword } from './auth/passwords.js';
@@ -404,6 +406,8 @@ export function registerRoutes(app: FastifyInstance): void {
     const agentCounts = await storage.countAgentPages(memberSpaces.map((s) => s.slug));
     // Which of those spaces keep a writing-rules page (a boolean, like the count — nothing from inside `.agent`).
     const writingRulesSpaces = await storage.spacesWithWritingRules(memberSpaces.map((s) => s.slug));
+    // Spaces whose agents propose instead of writing (migration 062): every member sees it, a banner needs it.
+    const reviewSpaces = await proposals.reviewModeSpaces();
     // Same "only while actually conflicted" gate as buildAdminSpacesList —
     // this list is polled (Sidebar/ConflictBanner/SpaceSwitcher all share
     // the ['spaces'] query), so a `git grep` per space would be wasted work
@@ -418,6 +422,7 @@ export function registerRoutes(app: FastifyInstance): void {
         // The ignore list names folders of the repository: space admins only (the effective `lightFootprint` flag is not a secret).
         if (!adminSlugs.has(s.slug)) delete info.scanIgnore;
         info.agentRules = buildAgentRulesInfo(agentCounts.get(s.slug) ?? 0, adminSlugs.has(s.slug), writingRulesSpaces.has(s.slug));
+        if (reviewSpaces.has(s.slug)) info.agentWriteMode = 'review';
         return info;
       }),
     );
@@ -892,6 +897,10 @@ export function registerRoutes(app: FastifyInstance): void {
     await session.requireSpaceRole(request, body.space, 'editor');
     session.requireWriteScope(request);
     await session.requireAgentWriteAllowed(request.authUser!, body.space, storage.normalizeDirParam(body.parentPath));
+    // A page created with content (a Y.Doc state or a base) by an agent in a review space would skip the queue.
+    if (request.tokenScopes !== undefined && (body.ydocState !== undefined || body.base !== undefined)) {
+      await proposals.assertTokenMayWriteDirect(body.space, 'creating a page with content over the REST API');
+    }
 
     if (body.id !== undefined) {
       const existing = await storage.getEntry(body.id);
@@ -959,7 +968,10 @@ export function registerRoutes(app: FastifyInstance): void {
     const entry = await session.requirePageRole(request, id, 'editor');
     if (entry.kind !== 'doc') throw badRequest('replace-text only supports documents');
     const user = request.authUser!;
-    try { return await collab.replaceDocumentText(id, request.body, { name: user.name, email: user.email }, async () => { await session.requirePageRole(request, id, 'editor'); }); }
+    try { return await collab.replaceDocumentText(id, request.body, { name: user.name, email: user.email }, async () => {
+      const current = await session.requirePageRole(request, id, 'editor');
+      if (request.tokenScopes !== undefined) await proposals.assertTokenMayWriteDirect(current.space, 'passage edits');
+    }); }
     catch (err) { if (err instanceof DocumentEditError) return reply.status(err.status).send(err.toJSON()); throw err; }
   });
 
@@ -1164,16 +1176,29 @@ export function registerRoutes(app: FastifyInstance): void {
     session.requireWriteScope(request);
     const user = request.authUser!;
 
+    const reviewMode = request.tokenScopes !== undefined && (await proposals.getAgentWriteMode(entry.space)) === 'review';
+    if (reviewMode && entry.kind !== 'doc') throw forbidden(proposals.reviewRefusal('changing this kind of page'));
     if (body.expectedLocation !== undefined || body.expectedRevision !== undefined || body.edits !== undefined || (entry.kind === 'doc' && body.markdown !== undefined && request.tokenScopes !== undefined)) {
       if (entry.kind !== 'doc') throw badRequest('guarded body edits only support document pages');
       try {
         // Pass the original object: guarded bodies reject metadata/unknown fields.
-        return await collab.editDocumentBody(id, request.body, { name: user.name, email: user.email }, async () => { await session.requirePageRole(request, id, 'editor'); });
+        const authorize = async () => { await session.requirePageRole(request, id, 'editor'); };
+        if (reviewMode) {
+          const proposed = await proposals.proposeDocumentEdit(id, request.body, user, request.tokenId ?? 'api-token', 'rest', authorize);
+          reply.status(202);
+          return proposed;
+        }
+        return await collab.editDocumentBody(id, request.body, { name: user.name, email: user.email }, async () => {
+          const current = await session.requirePageRole(request, id, 'editor');
+          if (request.tokenScopes !== undefined) await proposals.assertTokenMayWriteDirect(current.space, 'direct document edits');
+        });
       } catch (err) {
         if (err instanceof DocumentEditError) return reply.status(err.status).send(err.toJSON());
         throw err;
       }
     }
+
+    if (reviewMode) throw forbidden(proposals.reviewRefusal('document metadata changes'));
 
     if (entry.kind === 'doc') {
       if (body.markdown === undefined && body.icon === undefined && body.cover === undefined && body.order === undefined) {
@@ -1206,7 +1231,13 @@ export function registerRoutes(app: FastifyInstance): void {
       // (SHELL's tree reorder always sends order alone, same shape as an icon/cover-only
       // PUT) — not handled in this branch, same as icon/cover's own precedent above only
       // fully applies to the no-markdown path.
-      const result = await collab.editDocBody(id, markdownBody, iconOverride, coverOverride);
+      let result;
+      try {
+        result = await collab.editDocBody(id, markdownBody, iconOverride, coverOverride, body.baseRevision);
+      } catch (err) {
+        if (err instanceof collab.RevisionConflictError) return reply.status(409).send({ error: err.message, code: err.code, currentRevision: err.currentRevision });
+        throw err;
+      }
       gitSync.noteActivity(entry.space);
       return result;
     }
@@ -1412,6 +1443,7 @@ export function registerRoutes(app: FastifyInstance): void {
     assertDemoAgentRootIntact(request.authUser!, entry.relPath, 'Renaming the .agent folder');
     const before = snapshotPageChange(entry);
     session.requireWriteScope(request);
+    if (request.tokenScopes !== undefined) await proposals.assertTokenMayWriteDirect(entry.space, 'renaming pages');
     gitSync.recordEditor(entry.space, { name: request.authUser!.name, email: request.authUser!.email });
 
     let result: PageMeta;
@@ -1589,6 +1621,8 @@ export function registerRoutes(app: FastifyInstance): void {
     const entry = await session.requirePageRole(request, id, 'editor');
     session.requireWriteScope(request);
     const user = request.authUser!;
+    // Restoring replaces the page text: for an agent in a review space that is a write the queue does not cover.
+    if (request.tokenScopes !== undefined) await proposals.assertTokenMayWriteDirect(entry.space, 'restoring an old version of a page');
     // A canvas is never written by Folio — not even to restore it (git or Obsidian can).
     if (entry.kind === 'canvas') throw badRequest('a canvas is read-only in Folio: restore it in Git or Obsidian');
     // An artifact is a folder: its versions are re-published (PUT /api/pages/:id/artifact), not restored file by file.
