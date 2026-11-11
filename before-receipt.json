@@ -1,0 +1,26 @@
+{
+  "mode": "before",
+  "baselineCommit": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+  "syntheticOnly": true,
+  "matchingBaseRevision": true,
+  "noInjectedScheduling": true,
+  "realBrowserKeyboard": true,
+  "realHttpMcp": true,
+  "typedBody": "# Shared editing example\n\nStatus: draft.\n\nOriginal paragraph stays.\n\nBrowser note: keep this sentence.",
+  "acceptedBody": "# Shared editing example\n\nStatus: reviewed.\n\nOriginal paragraph stays.\n\nBrowser note: keep this sentence.",
+  "bodyAfterUndo": "# Shared editing example\n\nStatus: reviewed.\n\nOriginal paragraph stays.\n\nBrowser note: keep this sentence.",
+  "undoRemovedOwnSentence": false,
+  "agentChangeRetainedAfterUndo": true,
+  "bodyAfterRedo": "# Shared editing example\n\nStatus: reviewed.\n\nOriginal paragraph stays.\n\nBrowser note: keep this sentence.",
+  "reloadRestMcpMatched": true,
+  "currentFileSha256": "2153947a7fa264592ca9ab24bb74496e62696a7e325a02fa1c9aa7787f6fbecc",
+  "runtimeCollabSha256": "e281b5d2b933002b61431a4dfea1cf3d17f78b3c9f034f52a1db898e7646be48",
+  "fixedCommit": null,
+  "runtimeSourceHashes": {
+    "server/collab.ts": "e281b5d2b933002b61431a4dfea1cf3d17f78b3c9f034f52a1db898e7646be48",
+    "server/mcp.ts": "41e888051e9d6de3cb3c3c015f9bd533b54f0e8bf676a96bf2d797de17d06813",
+    "server/routes.ts": "6f73dcec8c940d2e87407b930f342d415e42fd15be8f917a52e83e9d4b36cfc9",
+    "shared/contracts.ts": "588169ff7dc931bf5a2e2625818119d774764dd366c444b0d53e5a5ae2f5b3d1"
+  },
+  "additionalRuntimeSourcesCheckedAfterCapture": true
+}

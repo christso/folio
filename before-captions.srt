@@ -1,0 +1,30 @@
+1
+00:00:00,000 --> 00:00:02,931
+BEFORE: clean upstream 94f4e0a6e9f8
+Real browser keyboard input and real HTTP MCP. Synthetic page.
+
+2
+00:00:02,931 --> 00:00:07,021
+The browser sentence is confirmed by HTTP MCP.
+The agent reads this CURRENT body and revision.
+
+3
+00:00:07,021 --> 00:00:11,033
+MCP changes only Status, supplying the matching baseRevision.
+Both changes are present. No stale write or injected scheduling.
+
+4
+00:00:11,033 --> 00:00:15,739
+BEFORE: press Ctrl+Z. The browser sentence stays.
+A normal API update has destroyed its useful Undo history.
+
+5
+00:00:15,739 --> 00:00:19,500
+Ctrl+Y leaves the same text; Ctrl+Z did not undo the sentence.
+The API request succeeded, but local editing history was lost.
+
+6
+00:00:19,500 --> 00:00:24,500
+Separate reload and REST/MCP assertions passed (see receipt).
+Final frame held for readability.
+

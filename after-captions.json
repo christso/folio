@@ -1,0 +1,26 @@
+[
+  {
+    "at": 0.0001682330000003276,
+    "text": "AFTER: same baseline + focused patch c5545fdfed40\nReal browser keyboard input and real HTTP MCP. Synthetic page."
+  },
+  {
+    "at": 18.510740274999996,
+    "text": "Type a sentence in the browser.\nHTTP MCP confirms it; the agent reads this CURRENT body and revision."
+  },
+  {
+    "at": 22.601223367,
+    "text": "MCP changes only Status, supplying the matching baseRevision.\nBoth changes are present. No stale write, injected lock or acceptance delay."
+  },
+  {
+    "at": 26.585980476000003,
+    "text": "AFTER: press Ctrl+Z. Only the browser sentence disappears.\nThe agent’s Status change stays."
+  },
+  {
+    "at": 31.317878287,
+    "text": "Ctrl+Y restores the browser sentence.\nUndo and Redo preserve the agent’s independent change."
+  },
+  {
+    "at": 35.535262087,
+    "text": "Reload, browser and REST/MCP readbacks agree.\nThe difference is whether your own sentence can be undone after the API edit."
+  }
+]

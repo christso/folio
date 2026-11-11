@@ -1,0 +1,26 @@
+[
+  {
+    "at": 0.00016177100000095378,
+    "text": "BEFORE: clean upstream 94f4e0a6e9f8\nReal browser keyboard input and real HTTP MCP. Synthetic page."
+  },
+  {
+    "at": 2.9310701040000002,
+    "text": "Type a sentence in the browser.\nHTTP MCP confirms it; the agent reads this CURRENT body and revision."
+  },
+  {
+    "at": 7.020924816999999,
+    "text": "MCP changes only Status, supplying the matching baseRevision.\nBoth changes are present. No stale write, injected lock or acceptance delay."
+  },
+  {
+    "at": 11.032651287,
+    "text": "BEFORE: press Ctrl+Z. The browser sentence stays.\nA normal API update has destroyed its useful Undo history."
+  },
+  {
+    "at": 15.738697495,
+    "text": "Ctrl+Y leaves the same text; Ctrl+Z did not undo the sentence.\nThe API request succeeded, but local editing history was lost."
+  },
+  {
+    "at": 19.86956327,
+    "text": "Reload, browser and REST/MCP readbacks agree.\nThe difference is whether your own sentence can be undone after the API edit."
+  }
+]

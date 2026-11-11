@@ -1,0 +1,53 @@
+services:
+  postgres-before:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: folio
+      POSTGRES_PASSWORD: folio
+      POSTGRES_DB: folio
+    ports: ["127.0.0.1:55453:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U folio"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+  postgres-after:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: folio
+      POSTGRES_PASSWORD: folio
+      POSTGRES_DB: folio
+    ports: ["127.0.0.1:55454:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U folio"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:56393:6379"]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+  before:
+    image: folio-edit-history:before
+    container_name: folio-edit-history-before
+    ports: ["127.0.0.1:54893:4870"]
+    depends_on:
+      postgres-before: {condition: service_healthy}
+      redis: {condition: service_started}
+    environment:
+      DATABASE_URL: postgres://folio:folio@postgres-before:5432/folio
+      REDIS_URL: redis://redis:6379
+      FOLIO_SECRET: synthetic-evidence-secret-0000000000
+      PUBLIC_URL: http://localhost:4870
+  after:
+    image: folio-edit-history:after
+    container_name: folio-edit-history-after
+    ports: ["127.0.0.1:54894:4870"]
+    depends_on:
+      postgres-after: {condition: service_healthy}
+      redis: {condition: service_started}
+    environment:
+      DATABASE_URL: postgres://folio:folio@postgres-after:5432/folio
+      REDIS_URL: redis://redis:6379
+      FOLIO_SECRET: synthetic-evidence-secret-0000000000
+      PUBLIC_URL: http://localhost:4870

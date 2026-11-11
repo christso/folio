@@ -1,0 +1,30 @@
+1
+00:00:00,000 --> 00:00:18,511
+AFTER: same baseline + focused patch c5545fdfed40
+Real browser keyboard input and real HTTP MCP. Synthetic page.
+
+2
+00:00:18,511 --> 00:00:22,601
+The browser sentence is confirmed by HTTP MCP.
+The agent reads this CURRENT body and revision.
+
+3
+00:00:22,601 --> 00:00:26,586
+MCP changes only Status, supplying the matching baseRevision.
+Both changes are present. No stale write or injected scheduling.
+
+4
+00:00:26,586 --> 00:00:30,000
+AFTER: press Ctrl+Z. Only the browser sentence disappears.
+The agent’s Status change stays.
+
+5
+00:00:30,000 --> 00:00:35,100
+Ctrl+Y restores the browser sentence.
+Undo and Redo preserve the agent’s independent change.
+
+6
+00:00:35,100 --> 00:00:40,100
+Separate reload and REST/MCP assertions passed (see receipt).
+Final frame held for readability.
+
