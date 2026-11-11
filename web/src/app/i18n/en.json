@@ -148,6 +148,12 @@
     "history": "History",
     "moreActions": "More actions",
     "searchAndGo": "Search and jump to…",
+    "actions": {
+      "history": "History",
+      "export": "Export…",
+      "access": "Page access…",
+      "timer": "Start a timer…"
+    },
     "breadcrumbs": {
       "label": "Breadcrumbs",
       "navigateFailed": "Could not navigate",
@@ -406,6 +412,8 @@
     }
   },
   "outline": {
+    "hidePanel": "Hide panel",
+    "showPanel": "Show panel",
     "show": "Show outline",
     "hide": "Hide outline",
     "label": "Outline"
@@ -416,7 +424,16 @@
     "show": "Show notes",
     "tasksDone": "{{done}} of {{total}} checked"
   },
+  "todos": {
+    "label": "TODO",
+    "hide": "Hide TODOs",
+    "show": "Show TODOs",
+    "filterLabel": "Filter by assignee",
+    "all": "All",
+    "none": "No assignee"
+  },
   "comments": {
+    "mentionList": "Suggested people",
     "title": "Comments",
     "toggleCount": "Comments — {{count}} open",
     "comment": "Comment",
@@ -443,7 +460,25 @@
     "deleteThreadTitle": "Delete this thread?",
     "deleteThreadBody": "Deleting the first comment deletes the whole thread with its replies.",
     "saveFailed": "Could not save the comment",
-    "cannotAnchor": "Could not attach a comment to this selection. Try selecting plain text without formatting."
+    "cannotAnchor": "Could not attach a comment to this selection. Try selecting plain text without formatting.",
+    "board": {
+      "pick": "Comment on an element",
+      "pickingCancel": "Click an element… (cancel)",
+      "pickHint": "Click the element to comment on",
+      "element": "Element",
+      "elementDeleted": "The commented element was deleted",
+      "commentOn": "Comment on this element",
+      "markerLabel": "Comments on this element — {{count}} open",
+      "emptyHint": "No open comments. Select an element and press the comment button, or use “Comment on an element”.",
+      "show": "Comments"
+    },
+    "table": {
+      "element": "Cell",
+      "cellDeleted": "The row or column of the commented cell was deleted",
+      "commentOn": "Comment on this cell",
+      "markerLabel": "Comments on this cell — {{count}} open",
+      "emptyHint": "No open comments. Hover a cell and press its comment button to start a thread."
+    }
   },
   "pageChrome": {
     "saveFailed": "Could not save",
@@ -562,6 +597,8 @@
     "createLink": "Create link",
     "public": {
       "pill": "Opened via link · {{mode}}",
+      "whatIs": "What is Folio?",
+      "whatIsTagline": "AI-friendly wiki for modern teams",
       "editMode": "Edit",
       "viewMode": "View only",
       "invalid": "This link is invalid — it was revoked or never existed.",
@@ -912,6 +949,7 @@
     "syncFailed": "Could not sync the space",
     "fromTemplate": "From template…",
     "spaceHome": "Space home",
+    "search": "Search",
     "scanSettings": {
       "title": "Indexing & files",
       "ignoreLabel": "Do not index",
@@ -943,6 +981,7 @@
       "assistantKey": "Folio AI key",
       "imageStorage": "Image storage",
       "scanSettings": "Indexing & files…",
+      "agentSettings": "AI agents…",
       "openRepo": "Open repository",
       "connectGit": "Connect git",
       "publish": "Publish as website"
@@ -972,6 +1011,7 @@
       "loadFailed": "Could not load the page tree.",
       "empty": "No other pages in this space yet.",
       "label": "Page tree",
+      "title": "Pages",
       "collapse": "Collapse",
       "expand": "Expand",
       "addPage": "Add a page",
@@ -1434,7 +1474,7 @@
     "writingRules": {
       "action": "Check against writing rules",
       "noRules": "This space has no writing rules yet. A space admin can create them in the .agent section of the sidebar.",
-      "noKey": "The AI assistant isn’t set up yet — add a Cursor key in the account settings or ask an administrator.",
+      "noKey": "The AI assistant isn’t set up yet — connect a model provider in the account settings or ask an administrator.",
       "busy": "The assistant is busy with another request.",
       "fix": "Fix with Agent",
       "fixHint": "Hands these findings to Agent mode, which edits the page",
@@ -1442,7 +1482,7 @@
       "fixDisplay": "Fix with Agent: apply the suggested rewrites"
     },
     "settings": {
-      "title": "Folio AI (Cursor)",
+      "title": "Folio AI",
       "source": "Key source",
       "sources": { "personal": "My key", "space": "Shared key of this space", "instance": "Shared key of this instance", "environment": "Server key", "none": "Not configured" },
       "keyName": "Key name",
@@ -1466,9 +1506,62 @@
       "forgetFailed": "Couldn't remove the key.",
       "model": "Model",
       "autoModel": "Auto",
-      "modelHint": "Cursor picks the model automatically. This setting applies to new conversations.",
+      "modelHint": "Auto lets Cursor pick the model. This setting applies to new conversations.",
+      "modelUnavailable": "The saved model isn’t available because its provider is disconnected. Pick another model.",
+      "modelUnavailableGroup": "Unavailable",
+      "modelUnavailableOption": "{{model}} (not connected)",
       "modelsFailed": "Cursor model catalog unavailable",
       "modelSaveFailed": "Couldn't save the model."
+    },
+    "providers": {
+      "heading": "Models and connections",
+      "intro": "Connect more model providers next to Cursor, then pick any of their models below.",
+      "cursorHeading": "Cursor",
+      "notConnected": "Not connected",
+      "personalDisabled": "Personal connections are turned off on this instance. An administrator manages the shared keys.",
+      "saved": "{{provider}} key connected.",
+      "checkOk": "{{provider}} confirmed the key.",
+      "checkFailed": "{{provider}} didn't confirm the key. Check it or create a new one.",
+      "checkError": "Couldn't check the key.",
+      "names": { "cursor": "Cursor", "anthropic": "Claude (API key)", "minimax": "MiniMax", "codex": "Codex (ChatGPT)" },
+      "minimax": {
+        "name": "MiniMax",
+        "keyLabel": "MiniMax API key",
+        "keyPlaceholder": "Paste a MiniMax API key",
+        "hint": "The key is checked with MiniMax and stored encrypted."
+      },
+      "anthropic": {
+        "name": "Claude (API key)",
+        "keyLabel": "Anthropic API key",
+        "keyPlaceholder": "Paste an Anthropic API key",
+        "hint": "This is an API key from console.anthropic.com, billed by usage. A Claude subscription (Pro or Max) cannot be used here."
+      },
+      "codex": {
+        "name": "Codex (ChatGPT)",
+        "hint": "Uses your own ChatGPT plan and its limits, only for your own requests. It is never shared with the space or public sites.",
+        "warning": "For a server you run for yourself. OpenAI has not confirmed this use on shared servers. Device-code sign-in must be enabled in your ChatGPT security settings.",
+        "signIn": "Sign in with ChatGPT",
+        "signedIn": "Signed in with ChatGPT",
+        "enterCode": "Open the OpenAI page and enter this code:",
+        "copy": "Copy code",
+        "copied": "Code copied.",
+        "openPage": "Open the sign-in page",
+        "waiting": "Waiting for you to finish signing in…",
+        "cancel": "Cancel sign-in",
+        "expired": "The code expired. Start the sign-in again.",
+        "failed": "Sign-in failed. Try again.",
+        "failedWith": "Sign-in failed: {{error}}",
+        "startFailed": "Couldn't start the sign-in.",
+        "disconnect": "Disconnect",
+        "disconnectBody": "Codex stops working until you sign in again. Continue?",
+        "disconnectFailed": "Couldn't disconnect."
+      },
+      "sharedHeading": "Other providers",
+      "sharedIntroInstance": "Shared API keys of other model providers for the whole instance. Used where a member has no personal key and the space has no key of its own.",
+      "sharedIntroSpace": "Shared API keys of other model providers for this space. Members use them unless they connected a personal key.",
+      "sharedNotConfigured": "No shared {{provider}} key yet.",
+      "sharedReplace": "Replace with a new {{provider}} key",
+      "sharedSaved": "Shared {{provider}} key connected."
     },
     "sharedKey": {
       "titleInstance": "Shared Folio AI key",
@@ -1503,8 +1596,8 @@
       "history": "History",
       "noHistory": "No conversations yet.",
       "untitled": "Untitled conversation",
-      "notConfiguredTitle": "Connect Cursor first",
-      "notConfiguredDescription": "The agent needs your Cursor API key and a compatible server runtime.",
+      "notConfiguredTitle": "Connect a model first",
+      "notConfiguredDescription": "The assistant needs a connected model provider, such as a Cursor or Claude API key, and a compatible server runtime.",
       "openSettings": "Open settings",
       "emptyTitle": "How can I help?",
       "status": {
@@ -1524,7 +1617,7 @@
       "stop": "Stop",
       "finished": "Agent finished",
       "reconnecting": "Reconnecting…",
-      "sendFailed": "Couldn't send the message. Try again or check your Cursor key in settings.",
+      "sendFailed": "Couldn't send the message. Try again or check your connections in settings.",
       "placeholder": "Ask about Folio…",
       "send": "Send",
       "modes": { "ask": "Ask", "agent": "Agent" },
@@ -1551,7 +1644,7 @@
         "failed": "Couldn't save your answer."
       },
       "errors": {
-        "keyRequired": "Connect your Cursor key in settings first.",
+        "keyRequired": "Connect a model provider in settings first.",
         "busy": "Please wait, the previous request is still running.",
         "generic": "Couldn't get a reply. Please try again."
       }
@@ -1672,7 +1765,57 @@
     "soundLockedToast": "Click anywhere to enable the sound.",
     "failed": "Could not change the timer"
   },
+  "review": {
+    "title": "On review",
+    "sidebar": "On review",
+    "sidebarCount": "{{count}} waiting",
+    "listLabel": "Proposed edits",
+    "loading": "Loading…",
+    "empty": "Nothing is waiting for review.",
+    "loadFailed": "Could not load the proposal",
+    "decideFailed": "Could not save the decision",
+    "decided": "Decision saved.",
+    "kind": {"update": "Edit", "create": "New page"},
+    "source": {"mcp": "external agent", "rest": "API token", "assistant": "Folio AI"},
+    "status": {"stale": "Page changed since"},
+    "meta": "Proposed by {{name}} via {{source}}, {{date}}",
+    "staleNotice": "The page has changed since this edit was proposed. The differences below are against the text the page has now. Accepting replaces the page text with the proposed one.",
+    "staleAgain": "The page changed again while you were looking. The differences were reloaded; check them and accept once more.",
+    "createNotice": "This page does not exist yet. It will be created in {{path}}.",
+    "commentLabel": "Comment for the author (optional)",
+    "accept": "Accept",
+    "acceptStale": "Accept the changes anyway",
+    "reject": "Reject",
+    "legend": "- the page now, + the proposed text",
+    "unchanged": "… {{count}} unchanged lines",
+    "noChanges": "The proposed text is the same as the page.",
+    "tooLarge": "The texts are too large to compare line by line.",
+    "diffLabel": "Differences between the page and the proposal",
+    "newText": "Proposed text of the new page",
+    "emptyText": "(empty page)",
+    "banner_one": "An agent proposed an edit to this page. It stays as it is until an editor accepts it.",
+    "banner_other": "{{count}} agent edits to this page are waiting for an editor.",
+    "open": "Review",
+    "sidebarHint": "Edits made by AI agents wait here for an editor"
+  },
+  "agentSettings": {
+    "title": "AI agents",
+    "intro": "What happens when an AI agent (an external client over MCP or the API, or Folio AI) edits a page of this space.",
+    "direct": {"label": "Edit at once", "hint": "The default. The agent's edit goes into the page right away, as a person's edit does."},
+    "review": {"label": "Send edits for review", "hint": "An agent's edit to a Markdown page does not change the page until an editor accepts it. You and the other editors see it under \u201cOn review\u201d, with the differences."},
+    "scopeNote": "In review mode only Markdown pages are covered. Whiteboards, data tables, forms, bases, page properties, tags and artifacts cannot be changed by an agent at all while the mode is on; its comments still go through at once. People typing in the browser are never queued.",
+    "gitNote": "git push is not covered: whoever can push to the space's Git remote can still change files directly. That is controlled by the access rights on the remote itself.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saveFailed": "Could not save the setting"
+  },
+  "verification": {"assign": "Owner and review", "owner": "Owner", "noOwner": "No owner", "unknownOwner": "@{{name}} (no such person)", "verifiedOn": "Verified", "reviewBy": "Next review", "mark": "Mark as verified", "saveFailed": "Could not save", "invalid": "Ignored, not a valid date: {{keys}}", "treeOverdue": "Review overdue", "state": {"unverified": "Not verified"}, "badge": {"verified": "Verified {{date}} {{owner}}", "changed": "Changed after verification", "overdue": "Review overdue ({{days}} d)"}},
   "notifications": {
+    "untitledPage": "Untitled page",
+    "someone": "Someone",
+    "comment": {"mention": "{{name}} mentioned you in a comment on “{{page}}”", "reply": "{{name}} replied in a thread on “{{page}}”", "generic": "New activity on “{{page}}”"},
+    "proposal": {"pending": "{{name}} proposed an edit to \u201c{{page}}\u201d", "pendingCreate": "{{name}} proposed a new page \u201c{{page}}\u201d", "accepted": "{{name}} accepted your edit to \u201c{{page}}\u201d", "rejected": "{{name}} rejected your edit to \u201c{{page}}\u201d"},
+    "review": {"due": "“{{page}}” is overdue for review (due {{date}})"},
     "bell": "Notifications",
     "bellUnread": "Notifications ({{count}} unread)",
     "empty": "No notifications yet.",
@@ -1785,7 +1928,7 @@
         "answer": "On the “Release process” page: seven steps, the last one is the rollback plan.",
         "source": "Release process"
       },
-      "byos": "Bring your own subscription: the assistant runs on your Cursor API key. Add it whenever you like — the account menu, “Folio AI”."
+      "byos": "Bring your own key: the assistant runs on your own Cursor or Claude API key. Connect one whenever you like — the account menu, “Folio AI”."
     },
     "finish": {
       "doc": "Create my first document",
@@ -2071,6 +2214,7 @@
     "title": "Properties ({{n}})",
     "empty": "No properties yet.",
     "add": "Add property",
+    "addShort": "Property",
     "addAction": "Add",
     "keyLabel": "Property name",
     "keyPlaceholder": "Name",
@@ -2359,7 +2503,18 @@
       "depthHint2": "2 — through one page",
       "depthHint3": "3 — through two pages",
       "collapse": "Collapse local graph",
-      "expandSection": "Expand local graph"
+      "expandSection": "Expand local graph",
+      "depthLabel1": "Links: direct",
+      "depthLabel2": "Links: + neighbours",
+      "depthLabel3": "Links: + one more step",
+      "depthRow1": "Direct links only",
+      "depthRow2": "+ neighbours' links",
+      "depthRow3": "+ one more step",
+      "showing": "Showing:",
+      "showLabel1": "direct links",
+      "showLabel2": "+ neighbours' links",
+      "showLabel3": "+ one more step",
+      "depthCaption": "Which pages the graph shows"
     },
     "filters": {
       "title": "Filters",
@@ -2532,6 +2687,8 @@
       "user_enable": "Account reactivated",
       "user_cursor_connected": "Cursor connected",
       "user_cursor_disconnected": "Cursor disconnected",
+      "user_assistant_provider_connected": "Assistant provider connected",
+      "user_assistant_provider_disconnected": "Assistant provider disconnected",
       "session_revoke": "Session ended",
       "session_revoke_all": "Sessions ended",
       "group_create": "Group created",
@@ -2591,9 +2748,13 @@
       "chat_unlinked_by_admin": "Chat app unlinked by an admin",
       "assistant_instance_key_set": "Instance assistant key set",
       "assistant_instance_key_removed": "Instance assistant key removed",
+      "assistant_instance_provider_key_set": "Instance assistant provider key set",
+      "assistant_instance_provider_key_removed": "Instance assistant provider key removed",
       "assistant_key_policy": "Assistant key policy changed",
       "assistant_space_key_set": "Space assistant key set",
       "assistant_space_key_removed": "Space assistant key removed",
+      "assistant_space_provider_key_set": "Space assistant provider key set",
+      "assistant_space_provider_key_removed": "Space assistant provider key removed",
       "assistant_conversation_viewed": "Assistant conversation opened by an admin",
       "audit_export": "Audit log exported"
     }
@@ -2614,5 +2775,41 @@
     "confirmEverywhere": "Every browser signed in to this account will be signed out and its open pages disconnected.",
     "revokedCount_one": "{{count}} device signed out",
     "revokedCount_other": "{{count}} devices signed out"
+  },
+  "whatsNew": {
+    "title": "We've refreshed the design",
+    "banner": "The tags show where things moved. They go away when you click “Got it”.",
+    "introTextNoAnchors": "The app chrome has been redesigned. Here is where things are now:",
+    "gotIt": "Got it",
+    "dialogLabel": "What's new in the design",
+    "steps": {
+      "search": {
+        "title": "Search moved to the sidebar",
+        "text": "Or press {{shortcut}} from anywhere."
+      },
+      "treeChevron": {
+        "title": "Nested pages",
+        "text": "The arrow on the right of a row expands its nested pages."
+      },
+      "pageActions": {
+        "title": "Page actions",
+        "text": "History and the timer are right there; export, access and compare live in the “⋯” menu."
+      },
+      "properties": {
+        "title": "Properties are under the title",
+        "text": "Add and edit a page's properties right under its name."
+      },
+      "rightPanel": {
+        "title": "Right panel",
+        "text": "Graph, outline and TODO. “Links” on the graph picks how many pages to show, and a click on a TODO highlights it in the text."
+      }
+    },
+    "pins": {
+      "search": "search is here now · {{shortcut}}",
+      "treeChevron": "arrow expands nested pages",
+      "pageActions": "export, access, compare — here",
+      "properties": "properties — under the title",
+      "rightPanel": "graph, outline and TODO — here"
+    }
   }
 }

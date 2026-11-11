@@ -51,7 +51,7 @@ import type { ExcalidrawElement, ExcalidrawScene } from './confluenceWhiteboard.
 import { trackConnection } from './liveConnections.js';
 import { documentHistoryHash } from './documentPersistence.js';
 import { DOCUMENT_FILE_STATUS_MESSAGE, DOCUMENT_FILE_REQUEST_MESSAGE, type DocumentFileStatus } from '../shared/contracts.js';
-import { bodyRevision, DocumentEditError, planBodyEdit, planTextReplacement } from './documentEdits.js';
+import { bodyRevision as documentRevision, upstreamBodyRevision as bodyRevision, DocumentEditError, planBodyEdit, planTextReplacement } from './documentEdits.js';
 import type { DocumentBodyEditResult } from '../shared/contracts.js';
 import { withPageLocation } from './pageLocation.js';
 
@@ -434,7 +434,7 @@ export async function persistDoc(docName: string, ydoc: Y.Doc): Promise<boolean>
     // fails. A retry sees identical file bytes and cannot rediscover this write.
     if (written) gitSync.noteActivity(current.space);
     await upsertSnapshotRow(docName, capturedSnapshot, fileBodyHash(storage.docFileBody(newBody)));
-    setDocumentFileStatus(docName, ydoc, { version: 1, state: 'saved', revision: bodyRevision(docName, newBody), history: documentHistoryHash(capturedSnapshot) });
+    setDocumentFileStatus(docName, ydoc, { version: 1, state: 'saved', revision: documentRevision(docName, newBody), history: documentHistoryHash(capturedSnapshot) });
     if (!written) return true;
     // Title edited in the H1 (the usual way a new page gets its name): follow
     // with the slug while it is still the auto-derived one — see maybeAutoRenameSlug.
@@ -2708,21 +2708,27 @@ async function withDocumentRoom<T>(id: string, fn: (doc: Y.Doc, entry: storage.P
 }
 
 /** Body and revision are captured together from the same restored document. */
-export async function readDocumentBody(id: string): Promise<{ markdown: string; revision: string }> {
+export async function readDocumentBody(id: string): Promise<{ markdown: string; revision: string; bodyRevision: string }> {
   return withDocumentRoom(id, (doc) => {
     const markdown = doc.getText('content').toString();
-    return { markdown, revision: bodyRevision(id, markdown) };
+    return { markdown, revision: documentRevision(id, markdown), bodyRevision: bodyRevision(markdown) };
   });
 }
 
-/** API callers recheck authorization after room acquisition. No await separates planning and mutation. */
-export async function editDocumentBody(id: string, input: unknown, author: GitIdentity, authorize?: () => Promise<void>): Promise<DocumentBodyEditResult> {
+/** The callback runs under the location fence and room lease, immediately after validation. */
+export async function withPlannedDocumentEdit<T>(id: string, input: unknown, authorize: (() => Promise<void>) | undefined, apply: (plan: ReturnType<typeof planBodyEdit>, doc: Y.Doc, entry: storage.PageIndexEntry) => T | Promise<T>): Promise<T> {
   const expectedLocation = input && typeof input === 'object' && 'expectedLocation' in input ? input.expectedLocation : undefined;
   return withPageLocation(id, expectedLocation, () => withDocumentRoom(id, async (doc, entry) => {
     await authorize?.();
     const plan = planBodyEdit(id, doc.getText('content').toString(), input);
-    return persistPlannedBodyEdit(id, doc, entry, plan, author, typeof input === 'object' && input !== null && 'markdown' in input && input.markdown !== undefined);
+    return apply(plan, doc, entry);
   }));
+}
+
+/** API callers recheck authorization after room acquisition. No await separates planning and mutation. */
+export async function editDocumentBody(id: string, input: unknown, author: GitIdentity, authorize?: () => Promise<void>): Promise<DocumentBodyEditResult> {
+  return withPlannedDocumentEdit(id, input, authorize, (plan, doc, entry) =>
+    persistPlannedBodyEdit(id, doc, entry, plan, author, typeof input === 'object' && input !== null && 'markdown' in input && input.markdown !== undefined));
 }
 
 export async function replaceDocumentText(id: string, input: unknown, author: GitIdentity, authorize?: () => Promise<void>): Promise<DocumentBodyEditResult> {
@@ -2798,56 +2804,74 @@ export async function anchorQuote(id: string, quote: string): Promise<QuoteAncho
 }
 
 /**
+ * The revision of a document body: an opaque string (sha256 of the end-of-line-normalized markdown). read_page and
+ * GET /api/pages/:id return it for the text they return; update_page and PUT /api/pages/:id take it back as
+ * `baseRevision` and refuse the write when the body has changed since.
+ */
+export { upstreamBodyRevision as bodyRevision } from './documentEdits.js';
+
+/** A write that named the revision it was based on (`baseRevision`) found the body changed since. Carries the current revision. */
+export class RevisionConflictError extends HttpError {
+  readonly currentRevision: string;
+  constructor(currentRevision: string) {
+    super(409, 'the page changed since it was read (revision_conflict); read it again, apply your change to the current text and retry with the new revision', 'revision_conflict');
+    this.name = 'RevisionConflictError';
+    this.currentRevision = currentRevision;
+  }
+}
+
+/**
  * Routes a PUT's markdown through the live Y.Doc (full-text replace inside a
  * transaction) instead of writing the file directly. The doc's own 'update'
  * listener (attached in bindState) picks this up and debounces the disk
  * write; we additionally patch the in-memory index synchronously so the
  * caller's response (and any immediate GET/search) reflects it right away.
+ *
+ * With `baseRevision`, the live text is compared with it and the replacement
+ * is refused (RevisionConflictError, nothing written) on a mismatch. The
+ * comparison and the replacement share one synchronous block — no await
+ * between them — so nobody can type in between; everything that awaits
+ * (entry lookup, icon/cover persist) is done before it or after it.
  */
-export async function applyMarkdownUpdate(id: string, rawMarkdown: string, overrideIcon?: string | null, overrideCover?: string | null): Promise<void> {
+export async function applyMarkdownUpdate(id: string, rawMarkdown: string, overrideIcon?: string | null, overrideCover?: string | null, baseRevision?: string): Promise<void> {
   if (!docs.has(id)) return;
-  return withDocumentRoom(id, async (doc, entry) => {
-    const markdown = normalizeEol(rawMarkdown);
-
-    // icon/cover never ride the Yjs body (frontmatter isn't part of the CRDT), so an
-    // icon/cover-only PUT (body text unchanged) would otherwise never trigger the
-    // debounced write-back at all — persist it immediately instead of hoping a later
-    // body edit happens to carry it to disk too. resolveIconCoverOverride keeps the
-    // undefined=preserve / null=clear / string=set distinction correct — a naive
-    // `overrideIcon ?? entry.icon` would treat null the SAME as undefined (both are
-    // "nullish" to ??), silently turning an explicit clear into a no-op.
-    if (overrideIcon !== undefined || overrideCover !== undefined) {
-      const icon = storage.resolveIconCoverOverride(overrideIcon, entry.icon);
-      const cover = storage.resolveIconCoverOverride(overrideCover, entry.cover);
-      await storage.setDocIconCover(entry, icon, cover, markdown);
-    }
-
-    const ytext = doc.getText('content');
-    if (ytext.toString() !== markdown) {
-      // A legacy body write replaces the whole live text — including whatever
-      // someone typed into the room after the caller read the page. Captured
-      // before, stored after: no await between reading the text and replacing it.
-      const before = ytext.toString();
-      doc.transact(() => {
-        ytext.delete(0, ytext.length);
-        ytext.insert(0, markdown);
-      });
-      await backupRoomText(id, 'body replaced through the API', before);
-    }
-    await storage.patchEntryContent(entry, markdown);
-  });
+  return withDocumentRoom(id, (doc, entry) => replaceRoomBody(id, doc, entry, rawMarkdown, overrideIcon, overrideCover, baseRevision));
 }
 
-/**
- * Legacy replacement for internal writers and cookie REST PUT. It is
- * unguarded and can replace newer typing. External bots use editDocumentBody
- * with a revision instead.
- */
-export async function editDocBody(id: string, rawMarkdown: string, overrideIcon?: string | null, overrideCover?: string | null): Promise<PageMeta> {
+async function replaceRoomBody(id: string, doc: Y.Doc, entry: storage.PageIndexEntry, rawMarkdown: string, overrideIcon?: string | null, overrideCover?: string | null, baseRevision?: string): Promise<void> {
+  const markdown = normalizeEol(rawMarkdown);
+  const ytext = doc.getText('content');
+  const persistIconCover = async (): Promise<void> => {
+    if (overrideIcon !== undefined || overrideCover !== undefined) {
+      await storage.setDocIconCover(entry, storage.resolveIconCoverOverride(overrideIcon, entry.icon), storage.resolveIconCoverOverride(overrideCover, entry.cover), markdown);
+    }
+  };
+  if (baseRevision === undefined) await persistIconCover();
+  const before = ytext.toString();
+  if (baseRevision !== undefined && bodyRevision(before) !== baseRevision) throw new RevisionConflictError(bodyRevision(before));
+  const changed = before !== markdown;
+  if (changed) {
+    doc.transact(() => {
+      ytext.delete(0, ytext.length);
+      ytext.insert(0, markdown);
+    });
+  }
+  if (baseRevision !== undefined) await persistIconCover();
+  if (changed) await backupRoomText(id, 'body replaced through the API', before);
+  await storage.patchEntryContent(entry, markdown);
+}
+
+/** Legacy internal/cookie replacement. Optional upstream baseRevision is also checked on a restored room. */
+export async function editDocBody(id: string, rawMarkdown: string, overrideIcon?: string | null, overrideCover?: string | null, baseRevision?: string): Promise<PageMeta> {
   const seeding = seedingPromises.get(id);
   if (seeding) await seeding;
-  // Normalized for the file too: the next room opened on it is seeded from it.
   const markdown = normalizeEol(rawMarkdown);
+  if (baseRevision !== undefined) {
+    return withDocumentRoom(id, async (doc, entry) => {
+      await replaceRoomBody(id, doc, entry, markdown, overrideIcon, overrideCover, baseRevision);
+      return storage.toPageMeta(await storage.requireEntry(id));
+    });
+  }
   if (isDocLive(id)) {
     await applyMarkdownUpdate(id, markdown, overrideIcon, overrideCover);
     return storage.toPageMeta(await storage.requireEntry(id));

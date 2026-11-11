@@ -148,6 +148,33 @@ is deleted. Comments are stored in the database (migration 060), not in the
 Markdown file: they are not in Git, exports or published sites. The MCP tools
 `list_comments`, `add_comment` and `reply_comment` give agents the same access.
 
+**Comments on boards and tables.** A single element of a whiteboard or a cell of
+a data table can have its own thread; `add_comment` takes `elementId`, or
+`rowId` and `columnId`. A notification link opens the thread and shows the
+element or the cell. The thread of a deleted element, row or column stays in
+the list with a note.
+
+**Review of agent edits.** Per space (space menu, **AI agents**): **Edit at
+once** (default) or **Send edits for review**; only a space admin changes it. In
+review mode `update_page`, `create_page` and `PUT /api/pages/:id` with an API
+token create a proposal; the page text does not change until an editor or admin
+accepts it in the **On review** list, which shows line-by-line differences. A
+proposal whose page has changed since is marked and can be accepted only after
+the differences against the current text are shown. Only Markdown pages are
+covered; while the mode is on, agent tools for boards, tables, forms, bases,
+properties, tags and artifacts are refused. Comments from agents are posted at
+once, people editing in the browser do not go through the queue, and `git push`
+is not intercepted.
+
+**Owner and review date.** The properties `owner`, `verified` and `review_by`
+are stored in Git like other page properties. The properties section (edit mode)
+has an owner picker, the next review date and **Mark as verified** (90 days, or
+the page's previous period). A badge under the title shows **Verified**,
+**Changed after verification** or **Review overdue**; an overdue page is marked
+in the tree. `read_page` and `fetch` return a `verification` block. Once a day,
+overdue pages send a reminder to the owner's bell, or to the space admins when
+there is no owner, at most once a week per page.
+
 **Shared page timer.** Every page has a timer icon in its header (document, table,
 whiteboard, form, PDF/Office, a space's home page; a folder listing has one for
 the space): presets of 1, 3, 5 and 10 minutes, or a custom time (minutes and
@@ -886,8 +913,9 @@ sensitive field types are never stored.
 ## 11. Folio AI
 
 An assistant in the side panel with two modes: **Ask** (read only) and
-**Agent** (read and write). Each person adds a Cursor API key in their account
-settings, or an administrator provides a shared one (see "Who pays" below).
+**Agent** (read and write). Each person adds a key in their account settings
+(a Cursor key or a Claude API key), or an administrator provides a shared key
+(see "Who pays" below).
 
 The assistant uses **the same set of tools** as external clients do through
 MCP (section 12). In Ask mode the write tools are unavailable, and that is
@@ -944,19 +972,23 @@ recorded in the audit log, and the conversation page shows who opened it and
 when. Everyone else does not see the page, and a personal access token is
 refused there.
 
-**Bring your own subscription.** The assistant runs on a subscription you
-already have. Cursor is supported today; other providers are coming soon.
+**Bring your own key.** The assistant runs on a key you already have. Cursor
+and Claude (an Anthropic API key billed by usage; a Claude subscription cannot
+be used) are supported. The model picker groups models by provider. Claude
+remembers only the text of earlier messages, not earlier tool results. A reply
+is produced by the selected provider, so the pages the assistant reads go to
+it.
 
 **Who pays: personal, space and instance keys.** A run uses the first key that
 exists, in this order: the person's own key, the key of the space the question
-is asked in, the key of the instance, `CURSOR_API_KEY` from the server
-environment. A space administrator sets the key of a space (space menu, "Folio
+is asked in, the key of the instance, the key from the server
+environment (`CURSOR_API_KEY` or `ANTHROPIC_API_KEY`, per provider). A space administrator sets the key of a space (space menu, "Folio
 AI key"); an instance administrator sets the instance key (the "Shared key"
 tab of Assistant analytics) and can turn personal keys off so that everyone
 uses the shared one: a stored personal key is then ignored and the form for
 adding one is hidden. The assistant settings show
 whose key is in use. Shared keys are encrypted with `FOLIO_SECRET`, never
-returned by the API (only the key's name, the Cursor account and who set it
+returned by the API (only the key's name, the account and who set it
 and when) and every change is written to the audit log. The public demo
 cannot change them.
 
@@ -966,7 +998,7 @@ the site). Visitors are anonymous. The run is **Ask mode only**, confined to
 that one space and to its public pages: it cannot write, cannot read page
 history, and a page that is restricted, in `.agent` or a template is "not
 found" to it, like any other page that does not exist. It uses the key of the
-space, else of the instance, else `CURSOR_API_KEY`; the owner of that key pays,
+space, else of the instance, else the server environment (Cursor when it resolves, else a shared Claude key; never a personal key); the owner of that key pays,
 and without any key the site says Folio AI is not set up. A conversation is
 tied to the browser that started it by a random token (only its hash is
 stored). Questions are rate limited per address and per site
@@ -989,7 +1021,7 @@ migration procedure. This is a single-page API; multi-file publishers and their
 receipts remain separate.
 
 The `/mcp` endpoint with a personal access token (`folio_pat_…`), scopes
-`read` and `write`. 49 tools: listing spaces and trees, reading a page,
+`read` and `write`. 51 tools: listing spaces and trees, reading a page,
 search (plus `search` and `fetch` for ChatGPT deep research), creating and updating pages, resolving a Folio link, backlinks
 with context, a page's metadata (outline, tags, properties, links), a space's
 unresolved links and orphan pages, the link graph of a space or a page's neighbourhood, the rows of an Obsidian base (and creating or replacing one), publishing an interactive artifact, listing a space's templates and creating pages from them or saving a page as a template, checking a page against the space's writing rules, a space's tags and property keys, renaming a tag across a space, setting a page's properties, history and reading a page at a given
@@ -1050,7 +1082,10 @@ See [INSTALL](INSTALL.md).
   headers say so.
 - **Trash** with restore. Deleting a page that has children takes them along,
   and restoring brings them back.
-- **Notifications** about access requests, delivered instantly.
+- **Notifications** about access requests, delivered instantly. The bell also
+  reports an @mention in a comment and a reply in a thread you took part in
+  (only to people who can see the page; an agent's comment through MCP counts),
+  and an overdue page review (see below). There is no email.
 - **Interface languages**: English and Ukrainian; a new language is a set
   of bundle files. Content is not translated — it is data.
 - **Theme**: light, dark, system.

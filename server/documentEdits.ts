@@ -14,6 +14,11 @@ export function bodyRevision(id: string, markdown: string): string {
   return `body-v1:${createHash('sha256').update(JSON.stringify([id, markdown])).digest('hex')}`;
 }
 
+/** Upstream #11 compatibility revision; unlike revision, this is not page-bound. */
+export function upstreamBodyRevision(markdown: string): string {
+  return createHash('sha256').update(markdown.replace(/\r\n?/g, '\n')).digest('hex');
+}
+
 interface TextChange { from: number; to: number; text: string }
 
 function splitsSurrogate(text: string, at: number): boolean {
@@ -27,6 +32,14 @@ function validText(text: string): boolean {
 
 /** All guards and planning are synchronous. Apply the returned changes without awaiting. */
 export function planBodyEdit(id: string, before: string, input: unknown): { markdown: string; revision: string; changes: TextChange[] } {
+  // Accept upstream's spelling without restoring its unconditional bot-write fallback.
+  if (input && typeof input === 'object' && 'baseRevision' in input && input.baseRevision !== undefined) {
+    const { baseRevision, ...rest } = input as Record<string, unknown>;
+    if (typeof baseRevision !== 'string') throw new DocumentEditError(400, 'invalid_body_edit', 'baseRevision must be a string.');
+    const current = upstreamBodyRevision(before);
+    if (baseRevision !== current) throw new DocumentEditError(409, 'revision_conflict', 'The document body changed; read it again and reconcile the edit.', { currentRevision: current });
+    input = { ...rest, expectedRevision: rest.expectedRevision ?? bodyRevision(id, before) };
+  }
   if (!input || typeof input !== 'object' || !('expectedRevision' in input) || input.expectedRevision === undefined) {
     throw new DocumentEditError(428, 'revision_required', 'Read the page and pass its revision as expectedRevision.');
   }

@@ -2,26 +2,31 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
-  ChevronsRight,
+  ChevronDown,
+  Circle,
   Info,
   Lightbulb,
   ListTree,
   MessageSquareWarning,
   OctagonAlert,
   Square,
-  StickyNote,
-  Waypoints,
+  PanelRightClose,
+  PanelRightOpen,
   X,
   type LucideIcon,
 } from 'lucide-react';
 import { scrollActiveEditorToHeading, scrollActiveEditorToOffset } from '../../editor';
 import { extractHeadings, HEADING_ID_PREFIX } from '../../markdown/headings';
 import { extractNotes, type NoteKind } from '../../markdown/notes';
+import { extractTodos } from '../../markdown/todos';
+import { flashEditorTodo, flashReadingNote, flashReadingTodo } from './todoFlash';
+import { setPanelHidden, usePanelHidden, useRegisterPanel, useToolbarButtonMounted } from './panelVisibility';
 import { useLocalStorage } from '../hooks';
 import '../i18n/register';
 import { useLiveDocText } from '../liveDocText';
 import { useParams } from 'react-router';
 import { LocalGraphSection } from '../graph/LocalGraphSection';
+import { PanelSection } from './PanelSection';
 
 /** One icon per NoteEntry.kind — a compact visual hint for what kind of entry a row is. */
 const NOTE_ICONS: Record<NoteKind, LucideIcon> = {
@@ -32,6 +37,15 @@ const NOTE_ICONS: Record<NoteKind, LucideIcon> = {
   caution: OctagonAlert,
   task: Square,
 };
+
+/** The row's text without its `@handle` tokens (they are shown after it, in the accent colour). */
+function todoBody(text: string, assignees: readonly string[]): string {
+  const stripped = text.replace(/^\s*TODO\b[:\s]*/i, '').replace(/(^|\s)@[\p{L}\p{N}_.-]+/gu, ' ').replace(/\s+/g, ' ').trim();
+  return stripped || text;
+}
+
+/** The filter choice for "no assignee" — a value no `@handle` can collide with. */
+const NO_ASSIGNEE = ':none';
 
 export interface OutlinePanelProps {
   /** Raw page markdown — frontmatter (icon/cover) is stripped internally by extractHeadings, no need to pre-clean it here. */
@@ -44,6 +58,11 @@ export interface OutlinePanelProps {
    * no editor (a share view), where `markdown` is the only source anyway.
    */
   pageId?: string;
+  /**
+   * The page's title. A leading H1 equal to it is not listed in the outline: the title is right there on the page and
+   * a first entry that repeats it only pushes the real sections down.
+   */
+  title?: string;
 }
 
 /**
@@ -109,15 +128,21 @@ export interface OutlinePanelProps {
  * but hidden from the visible list by default — see doneCount/totalTasks
  * below.
  */
-export function OutlinePanel({ markdown, pageId }: OutlinePanelProps) {
+export function OutlinePanel({ markdown, pageId, title }: OutlinePanelProps) {
   const { t } = useTranslation('app');
   // Live text wins while someone is typing; the server snapshot is the
   // fallback for reading-only surfaces and for the moment before the collab
   // session connects.
   const live = useLiveDocText(pageId);
   const source = live ?? markdown;
-  const headings = useMemo(() => extractHeadings(source), [source]);
+  const allHeadings = useMemo(() => extractHeadings(source), [source]);
+  const headings = useMemo(() => {
+    const first = allHeadings[0];
+    if (first && first.level === 1 && title !== undefined && first.text.trim().toLowerCase() === title.trim().toLowerCase()) return allHeadings.slice(1);
+    return allHeadings;
+  }, [allHeadings, title]);
   const notes = useMemo(() => extractNotes(source), [source]);
+  const todos = useMemo(() => extractTodos(source), [source]);
   const [outlineOpen, setOutlineOpen] = useLocalStorage('folio:outline-open', true);
   // Round 30 tail (owner, 11.09: "now notes open only together with the
   // outline, and they have to be independent"): the two lists are separate reading aids
@@ -126,10 +151,17 @@ export function OutlinePanel({ markdown, pageId }: OutlinePanelProps) {
   // own persisted open/closed state, and the rail shows an icon for whichever
   // one is currently put away.
   const [notesOpen, setNotesOpen] = useLocalStorage('folio:notes-open', true);
+  // TODO lines (markdown/todos.ts) are a fourth section with the same own open/closed state, plus an
+  // assignee filter: 'all', '@handle' or NO_ASSIGNEE.
+  const [todosOpen, setTodosOpen] = useLocalStorage('folio:todos-open', true);
+  const [assigneeChoice, setAssigneeChoice] = useLocalStorage('folio:todos-assignee', 'all');
   // Graph view (16.10.2026): the page's local graph, a third section with its own open/closed state. Only where
   // there is a space and a page (not on a share link).
   const { space } = useParams<{ space: string }>();
-  const [graphOpen, setGraphOpen] = useLocalStorage('folio:local-graph-open', true);
+  const panelHidden = usePanelHidden();
+  // The show/hide button lives in the editor's toolbar row; only where there is no such row (no editor on the page)
+  // does the panel carry its own.
+  const toolbarButton = useToolbarButtonMounted();
   const hasGraph = !!space && !!pageId;
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -142,6 +174,22 @@ export function OutlinePanel({ markdown, pageId }: OutlinePanelProps) {
   const visibleNotes = indexedNotes.filter(({ entry }) => !(entry.kind === 'task' && entry.checked));
   const totalTasks = notes.filter((entry) => entry.kind === 'task').length;
   const doneTasks = notes.filter((entry) => entry.kind === 'task' && entry.checked).length;
+
+  const assigneeHandles = useMemo(
+    () => [...new Set(todos.flatMap((entry) => entry.assignees))].sort(),
+    [todos],
+  );
+  const someUnassigned = todos.some((entry) => entry.assignees.length === 0);
+  const assigneeOptions = ['all', ...assigneeHandles.map((handle) => `@${handle}`), ...(someUnassigned ? [NO_ASSIGNEE] : [])];
+  // A choice remembered from another page may not exist here: act as "All" without overwriting it.
+  const assignee = assigneeOptions.includes(assigneeChoice) ? assigneeChoice : 'all';
+  const visibleTodos = todos.filter((entry) =>
+    assignee === 'all'
+      ? true
+      : assignee === NO_ASSIGNEE
+        ? entry.assignees.length === 0
+        : entry.assignees.includes(assignee.slice(1)),
+  );
 
   // Escape closes the <1100px overlay drawer — same convention as
   // ui/Modal.tsx's own keydown handler.
@@ -156,33 +204,48 @@ export function OutlinePanel({ markdown, pageId }: OutlinePanelProps) {
 
   useEffect(() => {
     if (headings.length === 0) return;
-    const targets = headings
-      .map((h) => document.getElementById(HEADING_ID_PREFIX + h.slug))
-      .filter((el): el is HTMLElement => el !== null);
-    if (targets.length === 0) return; // source/live editor mode: no heading DOM to observe
-
-    const visible = new Set<string>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const slug = entry.target.id.slice(HEADING_ID_PREFIX.length);
-          if (entry.isIntersecting) visible.add(slug);
-          else visible.delete(slug);
-        }
-        if (visible.size === 0) return;
-        // Earliest heading in document order that's currently on screen.
-        const active = headings.find((h) => visible.has(h.slug));
-        if (active) setActiveSlug(active.slug);
-      },
-      // Counts a heading as "current" only once it's within the top ~30% of
-      // the viewport, not merely anywhere on screen.
-      { rootMargin: '0px 0px -70% 0px', threshold: 0 },
-    );
-    targets.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+    let observer: IntersectionObserver | null = null;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+    const attach = () => {
+      const targets = headings
+        .map((h) => document.getElementById(HEADING_ID_PREFIX + h.slug))
+        .filter((el): el is HTMLElement => el !== null);
+      if (targets.length === 0) {
+        // No heading DOM (yet): the reading view may still be loading — look again for a few seconds. In
+        // source/live there never is any, and the retries simply run out.
+        if (attempts++ < 20) retry = setTimeout(attach, 500);
+        return;
+      }
+      const visible = new Set<string>();
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const slug = entry.target.id.slice(HEADING_ID_PREFIX.length);
+            if (entry.isIntersecting) visible.add(slug);
+            else visible.delete(slug);
+          }
+          if (visible.size === 0) return;
+          // Earliest heading in document order that's currently on screen.
+          const active = headings.find((h) => visible.has(h.slug));
+          if (active) setActiveSlug(active.slug);
+        },
+        // Counts a heading as "current" only once it's within the top ~30% of
+        // the viewport, not merely anywhere on screen.
+        { rootMargin: '0px 0px -70% 0px', threshold: 0 },
+      );
+      targets.forEach((el) => observer!.observe(el));
+    };
+    attach();
+    return () => {
+      if (retry) clearTimeout(retry);
+      observer?.disconnect();
+    };
   }, [headings]);
 
-  if (headings.length === 0 && notes.length === 0 && !hasGraph) return null;
+  const hasContent = headings.length > 0 || notes.length > 0 || todos.length > 0 || hasGraph;
+  useRegisterPanel(hasContent);
+  if (!hasContent) return null;
 
   function scrollTo(slug: string) {
     // source/live: hands off to the mounted CodeMirror view (see this file's
@@ -198,39 +261,79 @@ export function OutlinePanel({ markdown, pageId }: OutlinePanelProps) {
   function scrollToNote(pos: number, index: number) {
     if (scrollActiveEditorToOffset(pos)) return;
     document.querySelector(`[data-note-index="${index}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    flashReadingNote(index);
   }
 
-  // Shared between the docked panel and the <1100px drawer — null renders
-  // nothing at all (no entries means no section, per the owner's ask), a
-  // completed checklist item stays counted (doneTasks/totalTasks) but out of
-  // the visible list (visibleNotes already filtered it out above).
-  function notesSection(variant: 'docked' | 'mobile', onHide?: () => void) {
-    if (notes.length === 0) return null;
-    const textSize = variant === 'docked' ? 'text-xs' : 'text-sm';
-    const rowPad = variant === 'docked' ? 'py-1' : 'py-2';
+  const hasHeadings = headings.length > 0;
+  const hasNotes = notes.length > 0;
+  const hasTodos = todos.length > 0;
+
+  function scrollToTodo(pos: number, index: number) {
+    if (scrollActiveEditorToOffset(pos)) {
+      flashEditorTodo(pos);
+      return;
+    }
+    document.querySelector(`[data-todo-index="${index}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    flashReadingTodo(index);
+  }
+
+  // The same anatomy docked and in the drawer: only the touch size of a row differs.
+  const rowPad = (variant: 'docked' | 'mobile') => (variant === 'docked' ? 'py-0' : 'py-1');
+  const closeDrawer = (variant: 'docked' | 'mobile') => {
+    if (variant === 'mobile') setMobileOpen(false);
+  };
+
+  function outlineSection(variant: 'docked' | 'mobile', first = false) {
+    if (!hasHeadings) return null;
     return (
-      <div className="mt-3">
-        <div className="mb-1 flex items-center gap-1 px-1.5">
-          <span className="text-xs font-medium text-neutral-400 dark:text-neutral-500">{t('notes.label')}</span>
-          {doneTasks > 0 && (
-            <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
-              {t('notes.tasksDone', { done: doneTasks, total: totalTasks })}
-            </span>
-          )}
-          {onHide && (
-            <button
-              type="button"
-              onClick={onHide}
-              aria-label={t('notes.hide')}
-              title={t('notes.hide')}
-              className="ml-auto rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-            >
-              <ChevronsRight size={14} />
-            </button>
-          )}
-        </div>
+      <PanelSection first={first} trailing={first ? hideButton : undefined} label={t('outline.label')} count={headings.length} open={outlineOpen} onToggle={() => setOutlineOpen((v) => !v)} toggleTitle={outlineOpen ? t('outline.hide') : t('outline.show')}>
+        {/* A rail: one hairline on the left, the active heading marked by an accent bar on it. */}
+        <ul className="relative flex flex-col gap-px pl-0.5 before:absolute before:top-0.5 before:bottom-0.5 before:left-[5px] before:w-px before:bg-neutral-200 dark:before:bg-neutral-800">
+          {headings.map((h) => {
+            const active = activeSlug === h.slug;
+            const deep = h.level >= 3;
+            return (
+              <li key={h.slug}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    scrollTo(h.slug);
+                    closeDrawer(variant);
+                  }}
+                  title={h.text}
+                  aria-current={active ? 'location' : undefined}
+                  className={`relative block w-full rounded-[5px] pr-1.5 text-left leading-[1.35] hover:bg-black/[0.045] dark:hover:bg-white/5 ${variant === 'docked' ? 'py-[3px]' : 'py-1.5'} ${deep ? 'pl-7 text-[12.5px]' : 'pl-4 text-[13px]'} ${
+                    active
+                      ? "font-medium text-neutral-900 before:absolute before:inset-y-1 before:left-0.5 before:w-0.5 before:rounded-sm before:bg-indigo-600 before:content-[''] dark:text-neutral-100 dark:before:bg-indigo-300"
+                      : deep
+                        ? 'text-neutral-400 hover:text-neutral-900 dark:text-neutral-500 dark:hover:text-neutral-100'
+                        : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
+                  }`}
+                >
+                  <span className="line-clamp-2">{h.text}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </PanelSection>
+    );
+  }
+
+  function notesSection(variant: 'docked' | 'mobile', first = false) {
+    if (!hasNotes) return null;
+    return (
+      <PanelSection
+        first={first}
+        trailing={first ? hideButton : undefined}
+        label={t('notes.label')}
+        count={doneTasks > 0 ? t('notes.tasksDone', { done: doneTasks, total: totalTasks }) : visibleNotes.length}
+        open={notesOpen}
+        onToggle={() => setNotesOpen((v) => !v)}
+        toggleTitle={notesOpen ? t('notes.hide') : t('notes.show')}
+      >
         {visibleNotes.length > 0 && (
-          <ul className="flex flex-col gap-0.5">
+          <ul className="flex flex-col gap-2">
             {visibleNotes.map(({ entry, index }) => {
               const Icon = NOTE_ICONS[entry.kind];
               return (
@@ -239,129 +342,124 @@ export function OutlinePanel({ markdown, pageId }: OutlinePanelProps) {
                     type="button"
                     onClick={() => {
                       scrollToNote(entry.pos, index);
-                      if (variant === 'mobile') setMobileOpen(false);
+                      closeDrawer(variant);
                     }}
                     title={entry.text}
-                    className={`flex w-full items-center gap-1.5 truncate rounded pl-1.5 pr-1.5 text-left ${textSize} ${rowPad} text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200`}
+                    className={`flex w-full items-start gap-2 text-left text-[13px] leading-[1.4] text-neutral-700 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100 ${rowPad(variant)}`}
                   >
-                    <Icon size={variant === 'docked' ? 12 : 14} className="shrink-0" />
-                    <span className="truncate">{entry.text}</span>
+                    <Icon size={12} className="mt-[3px] shrink-0 text-neutral-400 dark:text-neutral-500" aria-hidden="true" />
+                    <span className="line-clamp-2 min-w-0">{entry.text}</span>
                   </button>
                 </li>
               );
             })}
           </ul>
         )}
-      </div>
+      </PanelSection>
     );
   }
 
-  // The ≥1100px docked panel — collapsed (icon-only rail) or expanded,
-  // exactly as before this fix. Built as a variable rather than an early
-  // return so it can sit alongside the always-present <1100px trigger/drawer
-  // below (both need to coexist in one returned tree — CSS decides which is
-  // actually visible at a given width, not React).
-  const hasHeadings = headings.length > 0;
-  const hasNotes = notes.length > 0;
-  const showOutline = hasHeadings && outlineOpen;
-  const showNotes = hasNotes && notesOpen;
-  const showGraph = hasGraph && graphOpen;
+  // The filter is only offered once somebody on the page is named; its options are derived from the entries.
+  function todosSection(variant: 'docked' | 'mobile', first = false) {
+    if (!hasTodos) return null;
+    return (
+      <PanelSection
+        first={first}
+        trailing={first ? hideButton : undefined}
+        label={t('todos.label')}
+        count={visibleTodos.length}
+        open={todosOpen}
+        onToggle={() => setTodosOpen((v) => !v)}
+        toggleTitle={todosOpen ? t('todos.hide') : t('todos.show')}
+        actions={
+          assigneeHandles.length > 0 && (
+            <div className="relative">
+              <select
+                value={assignee}
+                onChange={(event) => setAssigneeChoice(event.target.value)}
+                aria-label={t('todos.filterLabel')}
+                title={t('todos.filterLabel')}
+                className="h-6 max-w-28 appearance-none rounded-md border-0 bg-neutral-100 px-2 pr-6 text-[12px] text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+              >
+                {assigneeOptions.map((option) => (
+                  <option key={option} value={option} className="text-neutral-900">
+                    {option === 'all' ? t('todos.all') : option === NO_ASSIGNEE ? t('todos.none') : option}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-neutral-500" aria-hidden="true" />
+            </div>
+          )
+        }
+      >
+        <ul className="flex flex-col gap-2">
+          {visibleTodos.map((entry) => (
+            <li key={entry.index}>
+              <button
+                type="button"
+                onClick={() => {
+                  scrollToTodo(entry.pos, entry.index);
+                  closeDrawer(variant);
+                }}
+                title={entry.text}
+                className={`flex w-full items-start gap-2 text-left text-[13px] leading-[1.4] text-neutral-700 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100 ${rowPad(variant)}`}
+              >
+                <Circle size={12} className="mt-[3px] shrink-0 text-neutral-400 dark:text-neutral-500" aria-hidden="true" />
+                <span className="line-clamp-2 min-w-0">
+                  {todoBody(entry.text, entry.assignees)}
+                  {entry.assignees.map((handle) => (
+                    <span key={handle} className="ml-1 text-[11px] text-indigo-600 dark:text-indigo-300">
+                      @{handle}
+                    </span>
+                  ))}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </PanelSection>
+    );
+  }
 
-  /** The put-away sections, as icons that bring their own list back — nothing else. */
-  const railButtons = (
-    <>
-      {hasHeadings && !outlineOpen && (
-        <button
-          type="button"
-          onClick={() => setOutlineOpen(true)}
-          aria-label={t('outline.show')}
-          title={t('outline.show')}
-          className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-        >
-          <ListTree size={16} />
-        </button>
-      )}
-      {hasGraph && !graphOpen && (
-        <button
-          type="button"
-          onClick={() => setGraphOpen(true)}
-          aria-label={t('graph.local.show')}
-          title={t('graph.local.show')}
-          className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-        >
-          <Waypoints size={16} />
-        </button>
-      )}
-      {hasNotes && !notesOpen && (
-        <button
-          type="button"
-          onClick={() => setNotesOpen(true)}
-          aria-label={t('notes.show')}
-          title={t('notes.show')}
-          className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-        >
-          <StickyNote size={16} />
-        </button>
-      )}
-    </>
+  const hideButton = toolbarButton ? undefined : (
+    <button
+      type="button"
+      onClick={() => setPanelHidden(true)}
+      aria-label={t('outline.hidePanel')}
+      title={t('outline.hidePanel')}
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+    >
+      <PanelRightClose size={16} />
+    </button>
   );
 
-  const outlineSection = (
-    <div>
-      <div className="mb-1 flex items-center justify-between px-1.5">
-        <span className="text-xs font-medium text-neutral-400 dark:text-neutral-500">{t('outline.label')}</span>
+  /** The whole panel is put away: one slim rail with the button that brings it back. */
+  const dockedPanel = panelHidden ? (
+    toolbarButton ? null : <div className="hidden w-10 shrink-0 border-l border-neutral-200 min-[1100px]:block dark:border-neutral-800">
+      <div className="flex h-10 items-center justify-center">
         <button
           type="button"
-          onClick={() => setOutlineOpen(false)}
-          aria-label={t('outline.hide')}
-          title={t('outline.hide')}
-          className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          onClick={() => setPanelHidden(false)}
+          aria-label={t('outline.showPanel')}
+          title={t('outline.showPanel')}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
         >
-          <ChevronsRight size={14} />
+          <PanelRightOpen size={16} />
         </button>
       </div>
-      <ul className="flex flex-col gap-0.5">
-        {headings.map((h) => (
-          <li key={h.slug}>
-            <button
-              type="button"
-              onClick={() => scrollTo(h.slug)}
-              title={h.text}
-              style={{ paddingLeft: `${(h.level - 1) * 10 + 6}px` }}
-              className={`block w-full truncate rounded py-1 pr-1.5 text-left text-xs ${
-                activeSlug === h.slug
-                  ? 'font-medium text-neutral-900 dark:text-neutral-100'
-                  : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
-              }`}
-            >
-              {h.text}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-
-  // The ≥1100px docked column. Either list can be open on its own, so this is
-  // "whatever is open, plus a rail icon for whatever is not" rather than one
-  // panel with one switch. With nothing open it degrades to the icon-only rail
-  // this panel has always had.
-  const dockedPanel = !showOutline && !showNotes && !showGraph ? (
-    <div className="hidden shrink-0 flex-col gap-1 p-2 min-[1100px]:flex">
-      <div className="sticky top-3 flex flex-col gap-1">{railButtons}</div>
     </div>
   ) : (
     <nav
-      aria-label={showOutline ? t('outline.label') : showNotes ? t('notes.label') : t('graph.local.title')}
-      className="ph-mask hidden w-56 shrink-0 min-[1100px]:block"
+      aria-label={t('outline.label')}
+      className="ph-mask hidden w-64 shrink-0 border-l border-neutral-200 min-[1100px]:block dark:border-neutral-800"
     >
-      <div className="sticky top-3 max-h-[calc(100vh-4.5rem)] overflow-y-auto pb-6 pl-2 pr-1">
-        {/* A section that's away is one click from coming back, without
-            disturbing the one that stayed. */}
-        {(!outlineOpen || !notesOpen || (hasGraph && !graphOpen)) && <div className="mb-1 flex items-center gap-1">{railButtons}</div>}
-        {showGraph && <LocalGraphSection space={space!} pageId={pageId!} variant="docked" onHide={() => setGraphOpen(false)} />}
-        {showOutline && outlineSection}
-        {showNotes && notesSection('docked', () => setNotesOpen(false))}
+      <div className="sticky top-0 max-h-screen overflow-x-hidden overflow-y-auto px-3 pb-6">
+        <div className="flex flex-col gap-4">
+          {hasGraph && <LocalGraphSection space={space!} pageId={pageId!} variant="docked" first trailing={hideButton} />}
+          {outlineSection('docked', !hasGraph)}
+          {notesSection('docked', !hasGraph && !hasHeadings)}
+          {todosSection('docked', !hasGraph && !hasHeadings && !hasNotes)}
+        </div>
       </div>
     </nav>
   );
@@ -406,31 +504,13 @@ export function OutlinePanel({ markdown, pageId }: OutlinePanelProps) {
                 it scroll together as one region within the drawer's fixed
                 height — matching the docked panel's own single scrolling
                 container. */}
-            <div className="flex-1 overflow-y-auto p-2">
-              <ul className="flex flex-col gap-0.5">
-                {headings.map((h) => (
-                  <li key={h.slug}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        scrollTo(h.slug);
-                        setMobileOpen(false);
-                      }}
-                      title={h.text}
-                      style={{ paddingLeft: `${(h.level - 1) * 10 + 6}px` }}
-                      className={`block w-full truncate rounded py-2 pr-1.5 text-left text-sm ${
-                        activeSlug === h.slug
-                          ? 'font-medium text-neutral-900 dark:text-neutral-100'
-                          : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
-                      }`}
-                    >
-                      {h.text}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {notesSection('mobile')}
-              {hasGraph && <LocalGraphSection space={space!} pageId={pageId!} variant="mobile" onNavigate={() => setMobileOpen(false)} />}
+            <div className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-2">
+              <div className="flex flex-col gap-4">
+                      {outlineSection('mobile')}
+                {notesSection('mobile')}
+                {todosSection('mobile')}
+                {hasGraph && <LocalGraphSection space={space!} pageId={pageId!} variant="mobile" onNavigate={() => setMobileOpen(false)} />}
+              </div>
             </div>
           </nav>
         </div>

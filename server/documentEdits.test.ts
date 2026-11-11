@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { documentBodyEditSchema } from '../shared/contracts.js';
-import { bodyRevision, planBodyEdit, planTextReplacement } from './documentEdits.js';
+import { bodyRevision, upstreamBodyRevision, planBodyEdit, planTextReplacement } from './documentEdits.js';
 
 describe('guarded document body edits', () => {
   const id = 'page-a';
@@ -12,6 +12,14 @@ describe('guarded document body edits', () => {
   });
   it('rejects stale replacements, including an otherwise unchanged replacement', () => {
     expect(() => planBodyEdit(id, body + 'browser', { expectedRevision: revision, markdown: body })).toThrow(/changed/);
+  });
+  it('accepts upstream revisions through the same guards without weakening a supplied fork revision', () => {
+    const baseRevision = upstreamBodyRevision(body);
+    expect(planBodyEdit(id, body, { baseRevision, markdown: body }).revision).toBe(revision);
+    expect(() => planBodyEdit(id, body + 'new', { baseRevision, markdown: body })).toThrow(expect.objectContaining({ code: 'revision_conflict' }));
+    expect(() => planBodyEdit(id, body, { baseRevision, expectedRevision: bodyRevision('other-page', body), markdown: body })).toThrow(expect.objectContaining({ code: 'revision_conflict' }));
+    expect(() => planBodyEdit(id, body, { baseRevision, markdown: '---\nkey: value\n---\ntext' })).toThrow(expect.objectContaining({ code: 'frontmatter_not_allowed' }));
+    expect(() => planBodyEdit(id, body, { markdown: body })).toThrow(expect.objectContaining({ code: 'revision_required' }));
   });
   it('uses exact original ranges, irrespective of request order or repeated text', () => {
     const from = body.lastIndexOf('alpha');

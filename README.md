@@ -222,6 +222,13 @@ editor (or the person who started it) resolves it. Comments are kept in the
 database, not in the Markdown, so Git history stays clean. Agents read and
 answer them through MCP.
 
+**Mentions and notifications.** Type `@` in a comment to pick a person from the
+space. The bell reports an @mention and a reply in a thread you took part
+in; a comment written by an agent through MCP notifies in the same way. There
+is no email. Comments can also be attached to a single element of a whiteboard
+or to a cell of a data table; the link in a notification opens the thread and
+shows the element or the cell.
+
 ---
 
 ## Side-by-side comparison
@@ -467,6 +474,14 @@ search (`tag:`, `prop:`), the tag tree and MCP like any other.
 
 ![The properties of a whiteboard, edited in the page header](docs/images/properties-board.png)
 
+**Owner and review date.** A page can have an owner and a date by which it
+should be checked, kept in Git as the properties `owner`, `verified` and
+`review_by`. **Mark as verified** in the properties section sets the next date
+(90 days by default). A badge under the title shows **Verified**, **Changed
+after verification** or **Review overdue**, and agents get the state in a
+`verification` block of `read_page`. Overdue pages remind their owner (or the
+space admins) in the bell, at most once a week per page.
+
 **A timer that belongs to the page.** The clock icon in the header starts a
 countdown (1, 3, 5 or 10 minutes, or your own) that everyone who has the page open
 sees and hears end together, for a workshop or a retro. Editors control it, readers
@@ -605,24 +620,29 @@ rules and the page before they write.
 
 ### Bring your own key
 
-Folio does not resell AI and does not mark it up. The assistant runs on a
-Cursor key: your own, or one that an administrator provides for a space or for
-the whole instance. Whoever owns the key pays.
+Folio does not resell AI and does not mark it up. The assistant runs on a key
+you already have: your own, or one that an administrator provides for a space
+or for the whole instance. Whoever owns the key pays.
 
-| Provider | Status |
+| Provider | How it connects |
 |---|---|
-| Cursor | **available** — each person connects their own key, or an administrator provides one for a space or for the whole instance |
-| Others | not supported yet |
+| Cursor | a Cursor key: personal, of a space or of the instance |
+| Claude | an Anthropic API key billed by usage (`claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`): personal, of a space or of the instance; a Claude subscription cannot be used |
+
+The model picker groups models by provider. Claude remembers only the text of
+earlier messages in a conversation, not earlier tool results. A reply is
+produced by the selected provider, so the pages the assistant reads go to it.
 
 **Who pays.** A run uses the first key that exists: the person's own key, then
 the key of the space, then the key of the instance, then `CURSOR_API_KEY` from
-the server environment. A space administrator sets a space's key (space menu,
+the server environment (`CURSOR_API_KEY` or `ANTHROPIC_API_KEY`, per provider). A space administrator sets a space's key (space menu,
 "Folio AI key"); an instance administrator sets the instance key and can turn
 personal keys off, so everyone uses the shared one. Shared keys are stored
 encrypted and are never shown again after saving; every change is in the audit
 log. Visitors of a [public site](#publish-a-space-as-a-website) have no key of
 their own, so their questions run on the key of the space, of the instance or
-of the server environment, in that order.
+of the server environment, in that order: Cursor when it resolves, else a
+shared Claude key. A personal key is never used there.
 
 Without a key everything else in Folio works as usual.
 
@@ -630,7 +650,7 @@ Without a key everything else in Folio works as usual.
 
 ## Built for agents
 
-**MCP server.** 49 tools over `/mcp`: list and search spaces, read and write
+**MCP server.** 51 tools over `/mcp`: list and search spaces, read and write
 pages, build forms, edit data table columns and views, convert a canvas to a board, read a page's outline, tags, properties and links, list a space's tags and
 property keys, rename a tag, set page properties, find unresolved links
 and orphan pages, read the link graph, query, create and edit Obsidian bases, create and edit whiteboards, publish interactive artifacts, list templates and create pages from them, query and update data tables,
@@ -648,6 +668,17 @@ claude mcp add folio --transport http https://wiki.example.com/mcp \
 VS Code, Codex, n8n (two importable workflows), Open WebUI, ChatGPT and Claude
 live in [integrations/](integrations/): configs with placeholders, rules for
 the agent and step-by-step instructions.
+
+**Review of agent edits.** In the space menu, **AI agents**, a space admin can
+switch from **Edit at once** to **Send edits for review**. Then `update_page`,
+`create_page` and `PUT /api/pages/:id` with an API token create a proposal, and
+the page changes only when an editor or admin accepts it in the **On review**
+list, which shows line-by-line differences. Only Markdown pages are covered.
+
+**Team skills.** A page tagged `skill`, with a `description` property, is
+offered to every connected agent through `list_skills`, `get_skill` and MCP
+prompts, so the team's instructions live in the wiki and not in a prompt file on
+each machine. Details: [docs/TEAM-SKILLS.md](docs/TEAM-SKILLS.md).
 
 **Markdown for an agent.** Any page — with its child pages, if you want — is
 one link that returns clean Markdown. No scraping, no HTML, no login flow:
@@ -916,6 +947,7 @@ optional recording of recent actions with all text masked, off with
 - [Docs-as-code without the IDE: edit your repository's docs in a browser](https://foliowiki.online/blog/docs-as-code-in-the-browser/)
 - [What is not there yet](docs/LIMITATIONS.md)
 - [MCP and REST for agents](docs/MCP.md)
+- [Team skills: instructions for agents as wiki pages](docs/TEAM-SKILLS.md)
 - [Link previews in Slack and Microsoft Teams](docs/CHAT-PREVIEWS.md)
 - [Changelog](CHANGELOG.md)
 
@@ -945,7 +977,8 @@ vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 ## Fork maintenance
 
 This fork follows [evergreen-it-dev/folio](https://github.com/evergreen-it-dev/folio).
-`main` tracks upstream; `deployment` is the integration base for this fork.
+`main` tracks upstream; `christso/main` is the maintained integration branch.
+The former `deployment` branch was consolidated into `christso/main`.
 Pin a tested commit or image digest when deploying.
 
 The guarded document editing increment is described in

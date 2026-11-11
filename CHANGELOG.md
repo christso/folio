@@ -11,6 +11,128 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
   location. Same-process structural coordination remains active when Redis
   is unavailable; these preconditions do not grant page access.
 
+### Changed
+
+- Sync upstream v0.4.5 while preserving guarded shared editing. Accept upstream
+  revision fields through the guarded room path. Review-mode proposals retain
+  body/location/access checks; direct passage tools are refused in review mode.
+
+- **Fork maintenance:** `christso/main` is the maintained default branch;
+  `main` mirrors upstream. Contribution instructions target the maintained
+  branch, and push CI covers both branches.
+
+### Fixed
+
+- Guard external document edits with the exact body revision returned by REST
+  or MCP reads. Stale replacements and invalid exact ranges fail without
+  overwriting newer edits; accepted changes use the existing Yjs room and
+  confirm file/snapshot persistence separately from Git publication. Legacy
+  unguarded bot body updates now require a revision; cookie PUT remains legacy.
+  Snapshot acquisition fails closed and overlapping persistence is serialized.
+  Comment anchors share the room lease and confirm durable identities; writing
+  rule checks wait for cold rooms to finish restoring.
+- Separate browser document connection/receipt from exact file and snapshot
+  confirmation and unverified Git publication. Retain failed-save recovery
+  copies, show bounded-retry guidance, and let editors retry the current writer.
+  Offline cues now agree. Add exact unique-passage REST/MCP editing during
+  unrelated typing and bounded reread/reconsideration in the supported assistant.
+  Existing strict revision edits and publication policy remain unchanged.
+
+## [0.4.5] - 2026-11-09
+
+Folio AI can run on Claude through an Anthropic API key, next to Cursor. Adds
+migration 064.
+
+### Added
+
+- **Folio AI on Claude, next to Cursor.** Claude runs on an Anthropic API key
+  billed by usage (`claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`);
+  a Claude subscription cannot be used. The key can be personal, per space, per
+  instance, or from `ANTHROPIC_API_KEY`, resolved in that order. The model
+  picker groups models by provider. A public site uses Cursor when it
+  resolves, else a shared Claude key, never a personal key. Cursor deployments
+  behave as before. Between your messages Claude remembers only the text of
+  earlier messages, not earlier tool results. A reply is produced by the
+  selected provider, so the pages the assistant reads go to that provider.
+  Other providers exist in the code but are switched off by default; the
+  operator of a self-hosted server can turn them on with an environment
+  variable, described in [docs/INSTALL.md](docs/INSTALL.md).
+
+## [0.4.4] - 2026-11-09
+
+Notifications and @mentions, comments on whiteboard elements and table cells,
+a review mode for edits made by agents, a page owner with a review date, and
+team skills served over MCP. Adds migrations 061, 062 and 063.
+
+### Added
+
+- **Notifications for comments.** The bell reports an @mention in a comment and
+  a reply in a thread you took part in. Only a person who can see the page is
+  notified. A comment written by an agent through MCP notifies in the same way.
+  Typing `@` in the comment field offers people from the space. There
+  is no email.
+
+- **Comments on whiteboard elements and table cells.** Comment on a single
+  element of a board or on a cell of a data table, in the browser and through
+  `add_comment` (`elementId`; `rowId` and `columnId`). The link in a
+  notification opens the thread and shows the element or the cell. The thread
+  of a deleted element, row or column stays in the list with a note.
+
+- **Review mode for edits by agents.** Set per space: space menu, **AI agents**,
+  **Edit at once** or **Send edits for review**. The default is **Edit at
+  once**; only a space admin can change it. In review mode `update_page`,
+  `create_page` and `PUT /api/pages/:id` with an API token create a proposal
+  and leave the page text as it is, until an editor or admin accepts the
+  proposal in the **On review** list, which shows line-by-line differences. If
+  the page has changed since, the proposal is marked and can be accepted only
+  after the differences against the current text are shown. Only Markdown pages
+  are covered: while the mode is on, the agent tools for boards, tables, forms,
+  bases, properties, tags and artifacts are refused. Comments from agents are
+  posted at once. People editing in the browser do not go through the queue,
+  and `git push` is not intercepted.
+
+- **Page owner and review date.** The properties `owner`, `verified` and
+  `review_by` are stored in Git as ordinary page properties. In the properties
+  section under the title (in edit mode): choose the owner, set the date of the
+  next review and press **Mark as verified** (the term is 90 days, or the
+  page's previous period). A badge under the title shows **Verified**,
+  **Changed after verification** or **Review overdue**, and an overdue page is
+  marked in the tree. `read_page` and `fetch` give an agent a `verification`
+  block with the state. Once a day, overdue pages send a reminder to the
+  owner's bell, or to the space admins when there is no owner, at most once a
+  week per page.
+
+- **Team skills over MCP.** A page with the tag `skill` and a `description`
+  property is offered to agents through the tools `list_skills` and
+  `get_skill` and as MCP prompts. Only pages the user can see are available,
+  public sites refuse the calls, and a new page is visible to the agent at
+  once. See [docs/TEAM-SKILLS.md](docs/TEAM-SKILLS.md).
+
+### Fixed
+
+- **`update_page` and `PUT /api/pages/:id` no longer silently replace newer
+  edits.** `read_page` and `GET /api/pages/:id` now return `bodyRevision`; pass
+  it back as `baseRevision` and a write based on a stale read is refused
+  (`revision_conflict`, HTTP 409) instead of replacing what was typed in the
+  page meanwhile. Without `baseRevision` the call replaces the whole page as
+  before, and the tool description no longer claims it merges. (reported in #11)
+
+## [0.4.3] - 2026-11-07
+
+A lighter, more convenient interface, redesigned after user feedback: one icon
+column and a visible expand arrow in the sidebar tree, search in the sidebar, a
+header with fewer buttons, page properties under the title and a tidier right
+panel. Also new: a TODO panel, comments on page text, MDX pages, and
+`llms.txt` for public sites. Adds migration 060.
+
+### Added
+
+- **A TODO panel.** Every line that contains the word TODO, in any document, is
+  collected in the **TODO** section of the right panel. Filter by assignee: the
+  people @mentioned on the line (in a table, anywhere in the row). A click jumps
+  to the line and briefly highlights it. The word TODO is highlighted in Live
+  edit and in Reading.
+
 - **Public sites are readable by AI agents.** Every published site now serves
   `llms.txt` (title, summary and a list of its pages grouped by section, each
   with a link to the page's Markdown and a one-line description taken from the
@@ -61,10 +183,36 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
 
 ### Changed
 
-- **Fork maintenance:** `christso/main` is the maintained default branch;
-  `main` mirrors upstream. Contribution instructions target the maintained
-  branch, and push CI covers both branches.
-
+- **A redesigned app chrome, from user feedback.** Nothing was removed; things
+  moved and got quieter.
+  - *Sidebar tree.* Every page has an icon in one column (its emoji, its page
+    kind, or a faint document glyph), so there are no empty gaps. The expand
+    arrow sits at the right end of the row and is always visible. Titles in
+    Search, Home, Starred and the tree start at one edge, and Starred shows each
+    page's own icon. A "Pages" label sits above the tree.
+  - *Search* moved into the sidebar as a "Search" row with the shortcut.
+    Ctrl/Cmd+K still opens it from anywhere.
+  - *Header.* Timer, history and notifications stay visible; Share is a
+    labelled button. Export, page access, side-by-side compare and writing rules
+    (and the file actions on PDF and Office pages) moved into a labelled "..."
+    menu. On phones the same menu holds everything.
+  - *Page properties* moved from the toolbar to under the page title; an empty
+    page shows a faint "+ Property".
+  - *Right panel.* A bordered column whose sections (Local graph, Outline,
+    Notes, TODO) collapse by their headers. The local graph has no controls on
+    top of it: it fits its nodes with room to spare, shortens long labels next
+    to the node and marks the current page with a soft ring; a quiet "Showing:
+    direct links" line under it opens the depth menu (direct links, + neighbours'
+    links, + one more step) that replaces 1, 2, 3, and the header shows how many
+    pages are on the graph. The outline runs along a thin rail with an accent
+    mark on the heading you are reading, smaller sub-headings, long headings on
+    two lines instead of cut with "…", and no repeat of the page title. Notes and
+    TODO share one layout: an icon, two lines of text, the assignee at the end;
+    the TODO assignee filter is a compact select next to the header. The button
+    that hides the panel sits in the editor's toolbar, next to the mode switch.
+  - The editor mode switch (Reading, Live edit, Source) is smaller.
+  - Once after the update, small tags next to the moved controls show where
+    things are now, with a short "We've refreshed the design" note and "Got it".
 - **Pages without a stored id get a stable one.** A document or whiteboard
   found on disk without an `id` used to get a random identifier each time
   the instance was rebuilt, so links to it broke. It now gets an id derived
@@ -87,20 +235,22 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
 
 ### Fixed
 
-- Guard external document edits with the exact body revision returned by REST
-  or MCP reads. Stale replacements and invalid exact ranges fail without
-  overwriting newer edits; accepted changes use the existing Yjs room and
-  confirm file/snapshot persistence separately from Git publication. Legacy
-  unguarded bot body updates now require a revision; cookie PUT remains legacy.
-  Snapshot acquisition fails closed and overlapping persistence is serialized.
-  Comment anchors share the room lease and confirm durable identities; writing
-  rule checks wait for cold rooms to finish restoring.
-- Separate browser document connection/receipt from exact file and snapshot
-  confirmation and unverified Git publication. Retain failed-save recovery
-  copies, show bounded-retry guidance, and let editors retry the current writer.
-  Offline cues now agree. Add exact unique-passage REST/MCP editing during
-  unrelated typing and bounded reread/reconsideration in the supported assistant.
-  Existing strict revision edits and publication policy remain unchanged.
+- **A status tag can be copied, cut and pasted.** `:status[...]` now survives
+  Ctrl/Cmd+C, X and V. The tag also sat about 6px above the text baseline and made
+  its line taller; it is now aligned.
+- **On phones, History and Page access stay open.** Opened from the "..." menu,
+  they closed on the first click inside them.
+
+- **An artifact on a share link fills the page and no longer shows its source.**
+  The artifact view used a fixed height taller than the real header, which left
+  an empty strip below the frame on a share link; the public site had the same
+  height. Guests of a share link or a public site no longer receive the
+  artifact's source origin and original URL, so the "From Claude" badge and the
+  link to the original are gone for them (a signed-in reader still sees both).
+  On a share link the artifact's actions (open in a new tab, fullscreen) now sit
+  in the page header instead of a separate row, and return inside the view in
+  fullscreen. Every share link's header also shows the Folio logo and a small
+  "What is Folio?" badge (hidden on phones) that links to the Folio site.
 
 - **Git sync no longer publishes an unresolved deletion or binary conflict.**
   When Folio deleted a page that Git edited (or the reverse), or both sides

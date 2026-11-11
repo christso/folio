@@ -4,14 +4,20 @@ The current state of Folio, for whoever picks the work up next — a person or
 an agent. It describes what exists now. It is rewritten with every public
 update rather than appended to, so there is no history to dig through.
 
-Version: **0.2.0**.
+Version: **0.4.5**.
 
 ## Fork maintenance
 
 The maintained default branch is `christso/main`; `main` mirrors upstream.
 Follow the branch and integration workflow in [AGENTS.md](../AGENTS.md#working-rules).
-The branch alignment preserves the released fixes and both issue evidence sets;
-its follow-up changes only instructions and CI routing, not application code.
+The November 2026 sync integrates upstream v0.4.5 (`94f4e0a`), including
+v0.4.4's released issue #11 fix (`61fa777`). No guarded-editing safeguard is
+retired: upstream offers optional whole-page revision checks, while this fork
+requires guarded bot writes and also protects ranges, passages, locations,
+queued authorization and confirmed file saves. Read results include both
+revision formats; upstream `baseRevision` requests use the same guarded room
+path. Review mode queues validated replacements/ranges and refuses direct
+passage tools. See [the sync assessment](verification/upstream-sync-0.4.5.md).
 
 ## What Folio is
 
@@ -627,7 +633,7 @@ PostgreSQL, not in Git.
 
 ### Agents
 
-- **MCP** at `/mcp`, 49 tools, each with explicit `title` and
+- **MCP** at `/mcp`, 51 tools, each with explicit `title` and
   `readOnlyHint` / `destructiveHint` / `idempotentHint` / `openWorldHint`
   annotations, plus a short `instructions` text on `initialize`. `search` and `fetch` are read-only twins of `search_pages` and `read_page` with the same access rules; they exist because ChatGPT deep research and company knowledge only accept tools with exactly those names. Ready-made client setups live in `integrations/` (placeholders only), and `.claude-plugin/marketplace.json` makes the Claude Code plugin installable from this repository. It accepts a
   personal access token (`folio_pat_…`) or an OAuth access token
@@ -848,6 +854,14 @@ PostgreSQL, not in Git.
   independent of the session: a bundle is code written by a stranger or an agent.
   A change that lets it read a cookie, call `/api/…` or load an arbitrary host
   breaks the model.
+
+- An artifact's source origin and original URL (`payload.source`, set in
+  `server/artifact/service.ts`) must never reach an anonymous reader: share-link
+  and public-site guests get none, only a signed-in reader does. On a share link
+  the artifact's toolbar is portalled into the page header (`toolbarHost`); in
+  fullscreen it must fall back inside the view, because the header is outside the
+  fullscreen element and the exit button would be unreachable, and switching
+  between the two must not remount the iframe.
 
 ## Lessons that cost something
 
