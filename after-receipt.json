@@ -1,0 +1,35 @@
+{
+  "mode": "after",
+  "baselineCommit": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+  "fixedCommit": "d8d0db83d947b7eb6d0ab4e6d3f29a99ce045b82",
+  "syntheticOnly": true,
+  "realHttpMcp": true,
+  "proposalSubmittedWithBaseRevision": true,
+  "injectedScheduling": "PostgreSQL SELECT FOR UPDATE holds the proposal claim; no application function is mocked or patched for capture",
+  "browserSentenceConfirmedBeforeRelease": true,
+  "acceptanceStatus": 409,
+  "acceptanceCode": "revision_conflict",
+  "proposalStoredStatus": "pending",
+  "browserSentenceAfterReload": true,
+  "mcpMarkdown": "# Shared proposal example\n\nStatus: draft.\n\nOriginal paragraph stays.\n\nBrowser addition: keep this sentence.\n",
+  "restMarkdown": "# Shared proposal example\n\nStatus: draft.\n\nOriginal paragraph stays.\n\nBrowser addition: keep this sentence.\n",
+  "fileContainsBrowserSentence": true,
+  "fileSha256": "87b9b4dd396a7e723c7309a4a593e20f967b17bd8063d7af4b1c6fb43b1bacfa",
+  "finalBodySha256": "880adc725b0a87ca4d25f0e1b15a082a5f5a113e1c1b4bc808c658be4cf86df6",
+  "assertionsPassed": true,
+  "video": {
+    "file": "after.mp4",
+    "bytes": 232040,
+    "sha256": "0808519f5d95089dadcb6ecf6e54e294585095b2daed18dbc5ffaf72011f02e2",
+    "durationSeconds": 19.7
+  },
+  "runtimeSourceHashes": {
+    "server/proposals.ts": "ee58bff1f79c354a578b133ea4c7b9c03b05b6322900f5dff27ebada591ea125",
+    "server/collab.ts": "e281b5d2b933002b61431a4dfea1cf3d17f78b3c9f034f52a1db898e7646be48",
+    "server/mcp.ts": "41e888051e9d6de3cb3c3c015f9bd533b54f0e8bf676a96bf2d797de17d06813",
+    "server/routes.ts": "6f73dcec8c940d2e87407b930f342d415e42fd15be8f917a52e83e9d4b36cfc9",
+    "shared/contracts.ts": "588169ff7dc931bf5a2e2625818119d774764dd366c444b0d53e5a5ae2f5b3d1",
+    "package-lock.json": "e7c3d79e625c5ce4bb1a15346927bf7ca8cef4db23b448b7f7e569ec11233c4f"
+  },
+  "runtimeMatchesPinnedCommit": true
+}

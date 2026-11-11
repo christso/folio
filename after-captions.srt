@@ -1,0 +1,24 @@
+1
+00:00:00,000 --> 00:00:04,804
+AFTER: same baseline + focused patch d8d0db83d947
+Real browser + HTTP MCP/REST; synthetic page only.
+
+2
+00:00:04,804 --> 00:00:07,796
+Automated REST acceptance is waiting.
+A test-held PostgreSQL row lock makes this ordering repeatable.
+
+3
+00:00:07,796 --> 00:00:11,434
+New sentence typed with browser keyboard input.
+HTTP MCP read_page confirms it on the server before acceptance resumes.
+
+4
+00:00:11,434 --> 00:00:16,102
+AFTER: acceptance returned HTTP 409 revision_conflict.
+The newer browser sentence is preserved; the proposal stays pending.
+
+5
+00:00:16,102 --> 00:00:19,700
+Reload + REST/MCP + current Markdown file agree:
+new browser sentence retained; proposal remains pending for review.
