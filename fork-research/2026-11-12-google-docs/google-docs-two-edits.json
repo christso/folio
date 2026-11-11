@@ -1,0 +1,97 @@
+{
+  "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+  "yjsVersion": "13.6.32",
+  "scope": "Pinned production setYText helper executed with real Yjs. Explicit-range case models fork mutations. No server, browser, Google Docs two-location, persistence or authorization test is claimed.",
+  "cases": [
+    {
+      "mode": "pr14-single-splice",
+      "browserInsertion": "between",
+      "browserUndoWorks": false,
+      "agentEditsSurviveUndo": true,
+      "apiDelta": [
+        {
+          "retain": 18
+        },
+        {
+          "delete": 69
+        },
+        {
+          "insert": "new.\n\nBrowser note: keep this sentence.\n\nMiddle paragraph.\n\nLast: new"
+        }
+      ],
+      "afterUndo": "# Example\n\nFirst: new.\n\nBrowser note: keep this sentence.\n\nMiddle paragraph.\n\nLast: new.\n\nTail paragraph.\n"
+    },
+    {
+      "mode": "pr14-single-splice",
+      "browserInsertion": "after",
+      "browserUndoWorks": true,
+      "agentEditsSurviveUndo": true,
+      "apiDelta": [
+        {
+          "retain": 18
+        },
+        {
+          "delete": 34
+        },
+        {
+          "insert": "new.\n\nMiddle paragraph.\n\nLast: new"
+        }
+      ],
+      "afterUndo": "# Example\n\nFirst: new.\n\nMiddle paragraph.\n\nLast: new.\n\nTail paragraph.\n"
+    },
+    {
+      "mode": "explicit-two-ranges",
+      "browserInsertion": "between",
+      "browserUndoWorks": true,
+      "agentEditsSurviveUndo": true,
+      "apiDelta": [
+        {
+          "retain": 18
+        },
+        {
+          "delete": 3
+        },
+        {
+          "insert": "new"
+        },
+        {
+          "retain": 63
+        },
+        {
+          "delete": 3
+        },
+        {
+          "insert": "new"
+        }
+      ],
+      "afterUndo": "# Example\n\nFirst: new.\n\nMiddle paragraph.\n\nLast: new.\n\nTail paragraph.\n"
+    },
+    {
+      "mode": "explicit-two-ranges",
+      "browserInsertion": "after",
+      "browserUndoWorks": true,
+      "agentEditsSurviveUndo": true,
+      "apiDelta": [
+        {
+          "retain": 18
+        },
+        {
+          "delete": 3
+        },
+        {
+          "insert": "new"
+        },
+        {
+          "retain": 28
+        },
+        {
+          "delete": 3
+        },
+        {
+          "insert": "new"
+        }
+      ],
+      "afterUndo": "# Example\n\nFirst: new.\n\nMiddle paragraph.\n\nLast: new.\n\nTail paragraph.\n"
+    }
+  ]
+}
