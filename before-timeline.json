@@ -1,0 +1,34 @@
+{
+  "rawSeconds": 20.6,
+  "speed": 1,
+  "captionClockOffsetSeconds": 1.4118123319999996,
+  "captions": [
+    {
+      "at": 0,
+      "text": "BEFORE | 94f4e0a6e9f8\nBrowser typing, then ONE normal MCP update changing two passages."
+    },
+    {
+      "at": 2.730972605,
+      "text": "Browser sentence is BETWEEN the target words.\nAgent reads the current body and revision, then changes First and Last."
+    },
+    {
+      "at": 5.061964161,
+      "text": "Both agent changes and the browser sentence are visible.\nPress Ctrl+Z to undo the browser sentence."
+    },
+    {
+      "at": 8.416449732,
+      "text": "BEFORE: Undo leaves the browser sentence in place.\nBoth agent changes remain; REST and MCP confirm the failure."
+    },
+    {
+      "at": 12.990607412,
+      "text": "Press Ctrl+Y to redo the browser edit.\nThen reload and verify the final body through REST and MCP."
+    },
+    {
+      "at": 15.431756490000001,
+      "text": "Reload, REST, MCP and the current Markdown file agree.\nREPRODUCED: Undo could not remove the browser sentence."
+    }
+  ],
+  "heldResultScreenshotSeconds": 6,
+  "heldCaption": "Actual result screenshot held for readability. Reload, REST, MCP and current Markdown file agree.\nBEFORE: Undo left the browser sentence in place.",
+  "note": "Real browser automation capture. Final still is the actual post-reload screenshot, labelled as held. API assertions are in the receipt."
+}

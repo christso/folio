@@ -1,0 +1,14 @@
+{
+  "before": {
+    "bytes": 194929,
+    "sha256": "4a9f8b15f63f77b6d06ac08f922c0e7fd3e93a21cd0eae2b5ce9c81f216ba9ae",
+    "rawSha256": "917b83aaa44c1111534dd921009d7d1980b4035268f7df7d0e5b628f2e87f693",
+    "resultScreenshotSha256": "a23d9b979379883e57636cf6a00eb47560f3bfab891c5a70bad1a330b701a218"
+  },
+  "after": {
+    "bytes": 207899,
+    "sha256": "65cad10492f83f0a0a55da7f1de0d1c2db4ea7bbaddd2b6f5a29443e781affda",
+    "rawSha256": "cb24f4f215e9f7ef6c75ce2aa5d0c103a4f4aca8157c870ae6b676f275999473",
+    "resultScreenshotSha256": "a50725fecf5dcebd6949ad2c924df4c913256e58bb2ca1534b05eb40e458ebb1"
+  }
+}

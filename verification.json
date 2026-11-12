@@ -1,0 +1,36 @@
+{
+  "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+  "fixed": "bef6512503ee4ea67de8a08ea528194e45dafc95",
+  "targetedTests": {
+    "files": [
+      "server/updatePageRevision.test.ts",
+      "server/collab.test.ts",
+      "server/collabTables.test.ts"
+    ],
+    "passed": 62
+  },
+  "beforeExtensionRegression": {
+    "commit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+    "newMultiPassageCasesFailed": 4,
+    "existingCasesPassed": 9
+  },
+  "typecheck": "passed on Node 22.23.4",
+  "productionDockerBuild": "passed including native checks",
+  "sourceReview": {
+    "status": "complete",
+    "actionableFindings": 0,
+    "additionalDeterministicYTextCasesPassed": 4003
+  },
+  "realBrowser": {
+    "before": "REPRODUCED",
+    "after": "PASS",
+    "agentBrowser": "0.33.2",
+    "browser": "Chrome 151",
+    "injectedFailures": false
+  },
+  "limits": [
+    "Diff search stops beyond 1024 inserted/deleted Unicode code points; fallback replaces one span.",
+    "Browser automation verifies this synthetic case, not production incidence or all document rewrites.",
+    "Git reconciliation paths are unchanged."
+  ]
+}

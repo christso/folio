@@ -1,0 +1,96 @@
+{
+  "case": "one-request-two-passages",
+  "status": "PASS",
+  "commit": "bef6512503ee4ea67de8a08ea528194e45dafc95",
+  "image": "sha256:114ba0317db3a0eb9189f0c4a79717bbd83fa4a6b3b45ac50083b5da6a25823f",
+  "atomicRequest": true,
+  "updatePageCalls": 1,
+  "bodyBeforeApi": "# Two passages\n\nFirst: old.\n\nMiddle: original.\nBrowser note: keep this sentence.\n\nLast: old.\n",
+  "bodyAfterApi": "# Two passages\n\nFirst: new.\n\nMiddle: original.\nBrowser note: keep this sentence.\n\nLast: new.\n",
+  "bodyAfterUndo": "# Two passages\n\nFirst: new.\n\nMiddle: original.\n\nLast: new.\n",
+  "undoRemovedOwnSentence": true,
+  "bothAgentChangesRetained": true,
+  "redoRetainsSentence": true,
+  "undoRestMcpMatch": true,
+  "markdown": "# Two passages\n\nFirst: new.\n\nMiddle: original.\nBrowser note: keep this sentence.\n\nLast: new.\n",
+  "fileSha256": "fa3433e1ecb6a163b52798603450bdaa516e0c3966c6d38c741889c8ef3d62ab",
+  "restMcpMatch": true,
+  "reloadRetainsChecks": true,
+  "httpTrace": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200,
+      "requestKeys": [
+        "email",
+        "password"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/pages/01M77E1GKVTTC1RFH6QTAV7E42",
+      "status": 200,
+      "requestKeys": []
+    },
+    {
+      "method": "GET",
+      "path": "/api/pages/01M77E1GKVTTC1RFH6QTAV7E42",
+      "status": 200,
+      "requestKeys": []
+    }
+  ],
+  "mcpTrace": [
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "update_page",
+      "inputKeys": [
+        "id",
+        "markdown",
+        "baseRevision"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    }
+  ],
+  "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+  "fixedCommit": "bef6512503ee4ea67de8a08ea528194e45dafc95",
+  "sourceHashes": {
+    "server/collab.ts": "5c37ca9cfa6aa556b2cac0675b4e536cdec8ef43c874550f1e94947f6d5c3463",
+    "server/gitSync.ts": "b3f11144f5510c1019bfca9ba6851778ba77a7ec7b24583fb2abde2a9cd347e4",
+    "server/mcp.ts": "41e888051e9d6de3cb3c3c015f9bd533b54f0e8bf676a96bf2d797de17d06813",
+    "server/routes.ts": "6f73dcec8c940d2e87407b930f342d415e42fd15be8f917a52e83e9d4b36cfc9",
+    "shared/contracts.ts": "588169ff7dc931bf5a2e2625818119d774764dd366c444b0d53e5a5ae2f5b3d1",
+    "package.json": "83a919db7d024e383ee55ec77da5de2a0e5bb7494b8a406189021cafef3d52bd",
+    "package-lock.json": "57da9dd14f2a89b8cbcabeb1d7c32942fd4b998f3f05363b7d4d225644a210f6"
+  },
+  "syntheticOnly": true,
+  "noFaultInjection": true,
+  "realBrowserKeyboard": true,
+  "realHttpMcp": true
+}
