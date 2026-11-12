@@ -1,0 +1,28 @@
+{
+  "speed": 1.5,
+  "captions": [
+    [
+      0,
+      "UPSTREAM 94f4e0a6e9f8 | One real MCP new-page proposal; reviewer opens Accept."
+    ],
+    [
+      3,
+      "Inject ONE body rename EIO. Title-only page creation is allowed. Click Accept."
+    ],
+    [
+      6,
+      "Real UI error. Proposal pending; first heading-only file already exists (readback asserted)."
+    ],
+    [
+      11,
+      "Clear the one-shot fault. Click Accept again on the SAME pending proposal."
+    ],
+    [
+      14,
+      "Retry creates proposal-retry-evidence-2.md beside the heading-only original."
+    ]
+  ],
+  "heldScreenshotCaption": "Actual screenshot after reload, held. TWO files from one proposal; REST, MCP and file receipts confirm each body.",
+  "heldSeconds": 9,
+  "note": "Real recorded UI followed by actual result.png held for readability. Holds and speed changes are editorial; SQL/IndexedDB/REST/MCP assertions are in receipt, not simulated UI."
+}

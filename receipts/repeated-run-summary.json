@@ -1,0 +1,54 @@
+{
+  "independentFreshInstance": true,
+  "sameImage": "sha256:fa7984772702704c073251866f59a4040b4b5891f165605996708efd04541429",
+  "results": [
+    {
+      "case": "snapshot-control",
+      "passed": true,
+      "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+      "baselineCount": 1,
+      "pageCount": null,
+      "editRetainedAfterServerCrash": null
+    },
+    {
+      "case": "snapshot-fault",
+      "passed": true,
+      "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+      "baselineCount": 2,
+      "pageCount": null,
+      "editRetainedAfterServerCrash": null
+    },
+    {
+      "case": "proposal-control",
+      "passed": true,
+      "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+      "baselineCount": null,
+      "pageCount": 1,
+      "editRetainedAfterServerCrash": null
+    },
+    {
+      "case": "proposal-fault",
+      "passed": true,
+      "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+      "baselineCount": null,
+      "pageCount": 2,
+      "editRetainedAfterServerCrash": null
+    },
+    {
+      "case": "durability-control",
+      "passed": true,
+      "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+      "baselineCount": null,
+      "pageCount": null,
+      "editRetainedAfterServerCrash": true
+    },
+    {
+      "case": "durability-fault",
+      "passed": true,
+      "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+      "baselineCount": null,
+      "pageCount": null,
+      "editRetainedAfterServerCrash": false
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-12",
+  "setup": "Fresh headed Chrome; existing signed-in synthetic document; offline availability not configured.",
+  "onlineControl": "Recovery comparison\n\nBASELINE-GDOCS-SENTINEL\n\nOriginal paragraph stays.\n\nOnline focus control: retained.\n",
+  "whileBrowserOfflineServerRead": "Recovery comparison\n\nBASELINE-GDOCS-SENTINEL\n\nOriginal paragraph stays.\n\nOnline focus control: retained.\n",
+  "afterReconnect": "Recovery comparison\n\nBASELINE-GDOCS-SENTINEL\n\nOriginal paragraph stays.\n\nOnline focus control: retained.\nOffl\n",
+  "afterReload": "Recovery comparison\n\nBASELINE-GDOCS-SENTINEL\n\nOriginal paragraph stays.\n\nOnline focus control: retained.\nOffl\n",
+  "baselineCount": 1,
+  "offlineKeyboardAttempt": "Offline addition: retain this line.",
+  "acceptedBeforeOfflineEditingStopped": "Offl",
+  "observedStatusWhileDisconnected": [
+    "Saving…",
+    "Trying to connect."
+  ],
+  "observedAfterReconnectStatus": "Saved to Drive.",
+  "sameBeforeDuring": true,
+  "afterReloadMatches": true,
+  "limits": "Only Offl was accepted before disconnected session stopped accepting input; not a full offline-edit test. No Google backend storage faults injected; no Google equivalent to Folio two-phase new-page proposal available. No inference about Google's internal CRDT/OT implementation."
+}

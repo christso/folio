@@ -1,0 +1,24 @@
+{
+  "speed": 1.0,
+  "captions": [
+    [
+      0,
+      "UPSTREAM 94f4e0a6e9f8 | CONTROL: baseline exists once; collaborative snapshot saved."
+    ],
+    [
+      4,
+      "Browser disconnected; disposable app stopped. Type an offline addition."
+    ],
+    [
+      18,
+      "Restart disposable app and reconnect with NO storage fault."
+    ],
+    [
+      24,
+      "CONTROL: original text and offline addition each appear once. Real readbacks agree."
+    ]
+  ],
+  "heldScreenshotCaption": "Result screenshot held. Baseline and edit each once. Reload, REST, HTTP MCP and file assertions passed.",
+  "heldSeconds": 9,
+  "note": "Real recorded UI followed by actual result.png held for readability. Holds and speed changes are editorial; SQL/IndexedDB/REST/MCP assertions are in receipt, not simulated UI."
+}

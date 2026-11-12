@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: folio
+      POSTGRES_DB: folio
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports: ["127.0.0.1::5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U folio"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+  app:
+    image: ${FOLIO_AUDIT_IMAGE:-folio-recovery-evidence:94f4e0a}
+    cap_drop: ["ALL"]
+    container_name: folio-recovery-audit-app
+    ports: ["127.0.0.1:54897:4870"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_started}
+    volumes:
+      - ./data:/app/data
+      - ./:/audit
+    environment:
+      DATABASE_URL: postgres://folio@postgres:5432/folio
+      REDIS_URL: redis://redis:6379
+      FOLIO_SECRET: ${FOLIO_AUDIT_SECRET}
+      PUBLIC_URL: http://127.0.0.1:54897
+    command: ["node", "--import", "/audit/io-faults.mjs", "--import", "tsx", "server/index.ts"]

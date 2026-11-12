@@ -1,0 +1,24 @@
+{
+  "speed": 1.0,
+  "captions": [
+    [
+      0,
+      "UPSTREAM 94f4e0a6e9f8 | FAULT TEST: baseline exists once; snapshot saved."
+    ],
+    [
+      4,
+      "Browser disconnected; disposable app stopped. Type an offline addition."
+    ],
+    [
+      18,
+      "Restart; inject ONE cancelled snapshot SELECT. No snapshot deleted. Release scheduling lock."
+    ],
+    [
+      24,
+      "CONFIRMED: original text duplicated; offline addition once. REST, MCP and file agree."
+    ]
+  ],
+  "heldScreenshotCaption": "Result screenshot held. Baseline duplicated. Reload retained this result (assertion receipt).",
+  "heldSeconds": 9,
+  "note": "Real recorded UI followed by actual result.png held for readability. Holds and speed changes are editorial; SQL/IndexedDB/REST/MCP assertions are in receipt, not simulated UI."
+}

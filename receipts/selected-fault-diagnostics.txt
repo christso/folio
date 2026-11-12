@@ -1,0 +1,9 @@
+[collab] failed to load snapshot for 01M775CSKXCCQ5P15P331ANSJR: error: canceling statement due to user request
+{"reproFault":"proposal-body-once","kind":"rename","injected":1,"code":"EIO"}
+{"reproFault":"body-once-proposal-retry-evidence","kind":"rename","injected":1,"code":"EIO"}
+{"reproFault":"durability-body","kind":"rename","injected":1,"code":"EIO"}
+[collab] ALSO failed to store the snapshot of page 01M775CSMFKEFY3TWQ4PFV8CGX; its latest text is only in memory: error: new row for relation "ydoc_state" violates check constraint "audit_snapshot_write_unavailable"
+{"reproFault":"durability-body","kind":"rename","injected":2,"code":"EIO"}
+[collab] ALSO failed to store the snapshot of page 01M775CSMFKEFY3TWQ4PFV8CGX; its latest text is only in memory: error: new row for relation "ydoc_state" violates check constraint "audit_snapshot_write_unavailable"
+{"reproFault":"durability-body","kind":"rename","injected":3,"code":"EIO"}
+[collab] ALSO failed to store the snapshot of page 01M775CSMFKEFY3TWQ4PFV8CGX; its latest text is only in memory: error: new row for relation "ydoc_state" violates check constraint "audit_snapshot_write_unavailable"

@@ -1,0 +1,28 @@
+{
+  "mode": "control",
+  "pageId": "01M775CSK5WWGDQWMVZDHA5ZC6",
+  "pagePath": "snapshot-control.md",
+  "snapshotBeforeSha256": "013821cb356517cba6ebff41611d8b45da922ebe432d31d2d17d03ec27557c21",
+  "cancelledLookupCount": 0,
+  "cancelledPid": null,
+  "baselineCount": 1,
+  "offlineMarkerCount": 1,
+  "bodyAfterReconnect": "# Snapshot control\n\nBASELINE-CONTROL-SENTINEL\n\nOriginal paragraph stays.\n\nOffline addition: retain this line.",
+  "restMcpMatch": true,
+  "fileSha256": "0763dac8c39a1ddfb3fe3eaf97c4a4c0174362369805369556ac52026794a3e1",
+  "reloadMatches": true,
+  "faultDescription": "No injected fault.",
+  "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+  "runtimeSourceHashes": {
+    "server/collab.ts": "e281b5d2b933002b61431a4dfea1cf3d17f78b3c9f034f52a1db898e7646be48",
+    "server/proposals.ts": "c7a8671c9565a4a2800bc9d4de31a4e7f16fd407c3c6adad79d672802455955e",
+    "server/storage.ts": "ed62e4c7761e833cfed7008cfac8870d0c40c6702a988ba074039cec02862c6d",
+    "server/mcp.ts": "41e888051e9d6de3cb3c3c015f9bd533b54f0e8bf676a96bf2d797de17d06813",
+    "server/routes.ts": "6f73dcec8c940d2e87407b930f342d415e42fd15be8f917a52e83e9d4b36cfc9",
+    "shared/contracts.ts": "588169ff7dc931bf5a2e2625818119d774764dd366c444b0d53e5a5ae2f5b3d1",
+    "package.json": "842ab5853454e067c659bde68d4b10ee13f3b4252d33827790d5cb0ab038ec99",
+    "package-lock.json": "e7c3d79e625c5ce4bb1a15346927bf7ca8cef4db23b448b7f7e569ec11233c4f"
+  },
+  "syntheticOnly": true,
+  "realBrowserKeyboard": true
+}
