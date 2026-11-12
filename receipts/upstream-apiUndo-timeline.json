@@ -1,0 +1,29 @@
+{
+  "rawSeconds": 17.8,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "UPSTREAM + PR14 | apiUndo\nOrdinary browser typing and native revision-guarded API/MCP. No injected failure."
+    },
+    {
+      "at": 3.9598560980000004,
+      "text": "Browser sentence confirmed by MCP read.\nAgent changes only Status using the freshly read baseRevision."
+    },
+    {
+      "at": 6.063451463,
+      "text": "Both browser and agent changes are visible.\nPress Ctrl+Z in the editor to undo the browser sentence."
+    },
+    {
+      "at": 8.958773242,
+      "text": "PASS: Undo removes only the browser sentence; the agent change remains."
+    },
+    {
+      "at": 14.222809382,
+      "text": "PASS: a later stale REST write returns 409 and retains the newer browser edit.\nExplicit reread/reconciliation with a fresh revision succeeds."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. PASS: single MCP passage edit preserves browser Undo/Redo. Stale REST returns 409; explicit reread succeeds. Reload/readbacks agree.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}

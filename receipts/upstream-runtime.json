@@ -1,0 +1,19 @@
+{
+  "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+  "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+  "image": "sha256:dba95538409d983182407525bca0321d45287f1dfb1906e64413b877ee149b1f",
+  "base": "http://127.0.0.1:54898",
+  "gitHost": "http://127.0.0.1:54899/shared.git",
+  "gitApp": "http://git-remote:8080/shared.git",
+  "appContainer": "folio-retirement-app",
+  "project": "folio-retirement-20261112",
+  "noFaultInjection": true,
+  "sourceHashes": {
+    "server/collab.ts": "30c92220814f5a2a3a8f7aab36dcc91b40409a24ab355510a44217d78cb8752e",
+    "server/gitSync.ts": "b3f11144f5510c1019bfca9ba6851778ba77a7ec7b24583fb2abde2a9cd347e4",
+    "server/mcp.ts": "41e888051e9d6de3cb3c3c015f9bd533b54f0e8bf676a96bf2d797de17d06813",
+    "server/routes.ts": "6f73dcec8c940d2e87407b930f342d415e42fd15be8f917a52e83e9d4b36cfc9",
+    "shared/contracts.ts": "588169ff7dc931bf5a2e2625818119d774764dd366c444b0d53e5a5ae2f5b3d1",
+    "package-lock.json": "e7c3d79e625c5ce4bb1a15346927bf7ca8cef4db23b448b7f7e569ec11233c4f"
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "scope": "Post-run route reload/Source render audit, not retroactive capture of console events during all earlier interactions.",
+  "results": [
+    {
+      "case": "apiUndo",
+      "route": "/s/collaboration-lab/p/doc-be50f73be68f8bf90d40e618",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "restUndo",
+      "route": "/s/collaboration-lab/p/doc-b35577b8beeb5ec0a36c861c",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "twoEdits",
+      "route": "/s/collaboration-lab/p/doc-e10d4e2c110f8cb5404c7f6f",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "gitUndo",
+      "route": "/s/collaboration-lab/p/doc-8108d746344a444741f55d50",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "threeWriters",
+      "route": "/s/collaboration-lab/p/doc-7c00fbbdc510deed3c4e66ff",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "twoBrowsers",
+      "route": "/s/collaboration-lab/p/doc-75bd9bd64ca9704d3fe05679",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "gitConflict",
+      "route": "/s/collaboration-lab/p/doc-d3edef0c25be4c066f09394c",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "adapter",
+      "route": "/s/collaboration-lab/p/doc-eb594109a0537b25763b4caf",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "pathMove",
+      "route": "/s/collaboration-lab/p/doc-4442df89dc20fd961479a8a9",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "review",
+      "route": "/s/collaboration-lab/p/doc-0bcb65d3525272c1c976f884",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "gitUndoFinalNewline",
+      "route": "/s/collaboration-lab/p/doc-ebe8abafa445798be91448ef",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "twoEditsSequential",
+      "route": "/s/collaboration-lab/p/doc-d8fb93e125161b8d543bd46b",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    },
+    {
+      "case": "quoteCompatibility",
+      "route": "/s/collaboration-lab/p/doc-c05142ddc97e9016a052fb25",
+      "status": "PASS",
+      "sourceEditorRendered": true,
+      "cumulativeUncaughtErrorCount": 0,
+      "cumulativeConsoleErrorCount": 0
+    }
+  ]
+}

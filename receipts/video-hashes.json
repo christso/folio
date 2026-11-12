@@ -1,0 +1,80 @@
+{
+  "upstream-apiUndo": {
+    "bytes": 241918,
+    "sha256": "9fa485b181babebe8344e0ac7a7f43731d86613638546efad595fb4d4732f8a4",
+    "rawSha256": "6c1889ac4279dc11cc0e9e28ccfd65e16b1801288a3bc1f5892c34710381d122",
+    "resultScreenshotSha256": "3866e8f74fab2c4bbf20eedbc90e13e2ba85eb9ace0167e7c850207faf3c9505"
+  },
+  "upstream-restUndo": {
+    "bytes": 133801,
+    "sha256": "943b2cae4178ac05432b3e299e31fbcbc70234f81863dacdad0c125c81c349b4",
+    "rawSha256": "b8575df727cd6887981cdd6731f1a49268edc8b7efe3b75f675e013fd518fa3e",
+    "resultScreenshotSha256": "85f8784178326e692847192e4c2ecc955bd51ffcf6c86ff63a41f30ddaf4f8ec"
+  },
+  "upstream-twoEdits": {
+    "bytes": 213321,
+    "sha256": "0d9440c2a0635e5c6d3c7d3302e81fb0d1460572e183c87d071214054d774c9b",
+    "rawSha256": "375901aa8887d3102d95a324a3030a6003fd6be6a4e4c0ce6a05c992f87c1f38",
+    "resultScreenshotSha256": "c361dffbee6e592170a1e12348b59b1585607a9af04be95d2b77a89e5f1e91eb"
+  },
+  "upstream-twoEditsSequential": {
+    "bytes": 166207,
+    "sha256": "8f7f62e9235c6ab320bb52f5e1a808d12d0a78af92e4ba582f9f76e14082dba9",
+    "rawSha256": "6a32078f86c5eecdc6b3bfc7661ad76ec8ad90e2881b65b0184285880fc4161f",
+    "resultScreenshotSha256": "41b1891754b0eb3f03ff01048b5fab84e314a8137d7f5ef1b61c3e840758546a"
+  },
+  "upstream-gitUndo": {
+    "bytes": 195378,
+    "sha256": "aa61b248253a0fa6ed2d0a7deca2cb14cce1e5a05ef1423691ccadcf5f92db29",
+    "rawSha256": "67602e821838a17f3f7522063093bed4fdf3f30a36cab964506056584b2692c0",
+    "resultScreenshotSha256": "2377ef158447c561189adb3fdf43bbed8cf84bdbcc2f91af429c1b6d27f6f9cb"
+  },
+  "upstream-gitUndoFinalNewline": {
+    "bytes": 215878,
+    "sha256": "6eef4308be486b73c0d5c54014216f4501a2d9801c459d3514024d6d82ef543d",
+    "rawSha256": "839f7581aea41ad5f934b7ea8085376c28e6497a72a9c09e727a90c17b959987",
+    "resultScreenshotSha256": "3778760e75c094da9369cf8d7e78b74177fb311967b0cf454d1095f6ef5d750f"
+  },
+  "upstream-threeWriters": {
+    "bytes": 145876,
+    "sha256": "99cfce8de75a865d864604707d1c4b43bdf8571ff1c4687855357371a33568c3",
+    "rawSha256": "539fa8859b01fed7af08de09f54d635ba3c1e7167c9acd641743e2c4c9ad829b",
+    "resultScreenshotSha256": "1dac72d18a41968fdaf9a9f934f0167dc19891d6a343b8c0f99696efdd6ae015"
+  },
+  "upstream-gitConflict": {
+    "bytes": 189195,
+    "sha256": "3237167320aa5906c8dc7b1ddad8cbd6db3b25a4d14192fcf75514de669a6af2",
+    "rawSha256": "30814c21ca4b0483e8d5efa483ed00b7dd932fd466991e196ad237f654286bfd",
+    "resultScreenshotSha256": "de657b2b5cfc9841397aa5e4f7fb7844d57d78d57c1772e14c8a54a528b0aa77"
+  },
+  "upstream-twoBrowsers": {
+    "bytes": 188931,
+    "sha256": "9bcf0d16b1b25ec89d50cce1f3bad5526ce80f46856b9fed5c5970c673c0e694",
+    "rawSha256": "861c815ce4908f680674888f65f0516694293e42ee748973bd3b06a49b54453a",
+    "resultScreenshotSha256": "368d206b1c4631aef98556e4afb9ae858591529e8272462f06cbfcae034636bb"
+  },
+  "upstream-quote": {
+    "bytes": 170088,
+    "sha256": "5305cb85ae02d1982b96fcfc3c9933a724505e9da465c9c7ec934def998b52a6",
+    "rawSha256": "bd69b5520fb7405ddfbf1c0cd1d6dca67dd1aaaac429fff17a9e83691deb6d65",
+    "resultScreenshotSha256": "5cafea900a784bd2fd4670817823636d0ae42bd26fd39504491d34e013511d54"
+  },
+  "upstream-review": {
+    "bytes": 155828,
+    "sha256": "8807bc9f5120acee044658004278440f2edf994e86fc7f19d5cc8a07dbb091e8",
+    "rawSha256": "e60ca830a040ef805cd6e051ab35cd18c547d409686b9d1562e3b7b61f1104c3",
+    "resultScreenshotSha256": "32621133880ec9f7024fac6116075b7f42e24c72c7b44b709256f6c0fbf19dfb"
+  },
+  "fork-gitUndo": {
+    "bytes": 135907,
+    "sha256": "300adc91e82d47b4cb0052d769168afde7ec62db0fd59c75ed9a65085457912f",
+    "rawSha256": "a0dae7a187b430effef9170120d21a8c1adad564f20a351a0f206f355089e583",
+    "resultScreenshotSha256": "cb9ffe2f3f76fed8b310033ae876942888344268b06d84a3cb8c2a750ada010b"
+  },
+  "fork-twoEdits": {
+    "bytes": 216067,
+    "sha256": "ba1899a31d543fa449d501696f18754ebbb1dbe767838eec08e9b7c8514a6596",
+    "rawSha256": "99a0c55c483870113b661281bedac86f95f4f9454997d5c07bea5e6c856412c2",
+    "resultScreenshotSha256": "3ce24d5a70c17df0091d43cfc245d8492276f06fd2c00e4cc3c263f7198370eb"
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "case": "clientCompatibility",
+  "status": "MIGRATION_REQUIRED",
+  "clientSourceCommit": "bffe3fb3d02859842e1bda74342e741a2dc87f8d",
+  "existingBrokerRead": {
+    "accepted": false,
+    "code": "unsupported_page"
+  },
+  "existingReplaceTextEndpointStatus": 404,
+  "nativeGuardedReadReplaceReadSucceeded": true,
+  "nativeResponseFields": [
+    "id",
+    "kind",
+    "order",
+    "path",
+    "space",
+    "status",
+    "title",
+    "updatedAt"
+  ],
+  "missingForkReceiptFields": [
+    "revision",
+    "changed",
+    "persistence",
+    "publication"
+  ],
+  "locationNote": "This test client checks current location on read. It does not recreate the fork atomic location fence or claim equivalent persistence receipts.",
+  "scope": "Read-only import of the profile-owned infra clone; synthetic grants and private test journal only. No production broker or infra source modified.",
+  "httpTrace": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200,
+      "requestKeys": [
+        "email",
+        "password"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/pages/doc-eb594109a0537b25763b4caf/replace-text",
+      "status": 404,
+      "requestKeys": [
+        "oldText",
+        "newText",
+        "expectedLocation"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/resolve?space=collaboration-lab&path=adapter.md",
+      "status": 200,
+      "requestKeys": []
+    },
+    {
+      "method": "GET",
+      "path": "/api/pages/doc-eb594109a0537b25763b4caf",
+      "status": 200,
+      "requestKeys": []
+    },
+    {
+      "method": "PUT",
+      "path": "/api/pages/doc-eb594109a0537b25763b4caf",
+      "status": 200,
+      "requestKeys": [
+        "markdown",
+        "baseRevision"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/resolve?space=collaboration-lab&path=adapter.md",
+      "status": 200,
+      "requestKeys": []
+    },
+    {
+      "method": "GET",
+      "path": "/api/pages/doc-eb594109a0537b25763b4caf",
+      "status": 200,
+      "requestKeys": []
+    }
+  ],
+  "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+  "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+  "noFaultInjection": true
+}

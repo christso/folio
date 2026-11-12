@@ -1,0 +1,289 @@
+{
+  "upstreamBaseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+  "upstreamPlusPr14": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+  "maintainedFork": "2e048814d1ea83fa6d3d03285d6e330b52a010e5",
+  "ordinaryFlowsOnly": true,
+  "rows": [
+    {
+      "variant": "upstream-plus-PR14",
+      "case": "apiUndo",
+      "status": "PASS",
+      "undoRemoved": true,
+      "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "upstream-plus-PR14",
+      "case": "gitConflict",
+      "status": "PASS",
+      "undoRemoved": null,
+      "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "upstream-plus-PR14",
+      "case": "gitUndo",
+      "status": "FAIL",
+      "undoRemoved": false,
+      "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "upstream-plus-PR14",
+      "case": "gitUndoFinalNewline",
+      "status": "PASS",
+      "undoRemoved": true,
+      "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "upstream-plus-PR14",
+      "case": "quote",
+      "status": "PASS",
+      "undoRemoved": null,
+      "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "upstream-plus-PR14",
+      "case": "restUndo",
+      "status": "PASS",
+      "undoRemoved": true,
+      "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "upstream-plus-PR14",
+      "case": "review",
+      "status": "PASS",
+      "undoRemoved": null,
+      "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "upstream-plus-PR14",
+      "case": "threeWriters",
+      "status": "FAIL",
+      "undoRemoved": false,
+      "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "upstream-plus-PR14",
+      "case": "twoBrowsers",
+      "status": "PASS",
+      "undoRemoved": null,
+      "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "upstream-plus-PR14",
+      "case": "twoEdits",
+      "status": "LIMITATION",
+      "undoRemoved": false,
+      "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "upstream-plus-PR14",
+      "case": "twoEditsSequential",
+      "status": "PASS",
+      "undoRemoved": true,
+      "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "maintained-fork",
+      "case": "gitUndo",
+      "status": "FAIL",
+      "undoRemoved": false,
+      "fixedCommit": "2e048814d1ea83fa6d3d03285d6e330b52a010e5",
+      "noFaultInjection": true
+    },
+    {
+      "variant": "maintained-fork",
+      "case": "twoEdits",
+      "status": "PASS",
+      "undoRemoved": true,
+      "fixedCommit": "2e048814d1ea83fa6d3d03285d6e330b52a010e5",
+      "noFaultInjection": true
+    }
+  ],
+  "clientCompatibility": {
+    "case": "clientCompatibility",
+    "status": "MIGRATION_REQUIRED",
+    "clientSourceCommit": "bffe3fb3d02859842e1bda74342e741a2dc87f8d",
+    "existingBrokerRead": {
+      "accepted": false,
+      "code": "unsupported_page"
+    },
+    "existingReplaceTextEndpointStatus": 404,
+    "nativeGuardedReadReplaceReadSucceeded": true,
+    "nativeResponseFields": [
+      "id",
+      "kind",
+      "order",
+      "path",
+      "space",
+      "status",
+      "title",
+      "updatedAt"
+    ],
+    "missingForkReceiptFields": [
+      "revision",
+      "changed",
+      "persistence",
+      "publication"
+    ],
+    "locationNote": "This test client checks current location on read. It does not recreate the fork atomic location fence or claim equivalent persistence receipts.",
+    "scope": "Read-only import of the profile-owned infra clone; synthetic grants and private test journal only. No production broker or infra source modified.",
+    "httpTrace": [
+      {
+        "method": "POST",
+        "path": "/api/auth/login",
+        "status": 200,
+        "requestKeys": [
+          "email",
+          "password"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/api/pages/doc-eb594109a0537b25763b4caf/replace-text",
+        "status": 404,
+        "requestKeys": [
+          "oldText",
+          "newText",
+          "expectedLocation"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/api/resolve?space=collaboration-lab&path=adapter.md",
+        "status": 200,
+        "requestKeys": []
+      },
+      {
+        "method": "GET",
+        "path": "/api/pages/doc-eb594109a0537b25763b4caf",
+        "status": 200,
+        "requestKeys": []
+      },
+      {
+        "method": "PUT",
+        "path": "/api/pages/doc-eb594109a0537b25763b4caf",
+        "status": 200,
+        "requestKeys": [
+          "markdown",
+          "baseRevision"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/api/resolve?space=collaboration-lab&path=adapter.md",
+        "status": 200,
+        "requestKeys": []
+      },
+      {
+        "method": "GET",
+        "path": "/api/pages/doc-eb594109a0537b25763b4caf",
+        "status": 200,
+        "requestKeys": []
+      }
+    ],
+    "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+    "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+    "noFaultInjection": true
+  },
+  "contracts": {
+    "case": "contracts",
+    "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+    "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+    "noFaultInjection": true,
+    "ordinaryActionsOnly": true,
+    "rename": {
+      "oldPath": "path-move.md",
+      "newPath": "path-move-renamed.md",
+      "bodyRevisionUnchanged": true,
+      "oldPathResolveStatus": 404,
+      "pendingWriteByIdStatus": 200,
+      "behavior": "Upstream bodyRevision guards content, not location. A native client can notice a completed move by resolving again; this is not the fork atomic location precondition."
+    },
+    "revokedWriteRole": {
+      "status": 403,
+      "noMutation": true,
+      "roleRestored": true
+    },
+    "httpTrace": [
+      {
+        "method": "POST",
+        "path": "/api/auth/login",
+        "status": 200,
+        "requestKeys": [
+          "email",
+          "password"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/api/pages/doc-4442df89dc20fd961479a8a9/slug",
+        "status": 200,
+        "requestKeys": [
+          "slug"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/api/pages/doc-4442df89dc20fd961479a8a9",
+        "status": 200,
+        "requestKeys": []
+      },
+      {
+        "method": "GET",
+        "path": "/api/resolve?space=collaboration-lab&path=path-move.md",
+        "status": 404,
+        "requestKeys": []
+      },
+      {
+        "method": "PUT",
+        "path": "/api/pages/doc-4442df89dc20fd961479a8a9",
+        "status": 200,
+        "requestKeys": [
+          "markdown",
+          "baseRevision"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/api/pages/doc-4442df89dc20fd961479a8a9",
+        "status": 200,
+        "requestKeys": []
+      },
+      {
+        "method": "PUT",
+        "path": "/api/spaces/collaboration-lab/members/bff58c24-d132-4a36-9496-f11cc3cd93a5",
+        "status": 200,
+        "requestKeys": [
+          "role"
+        ]
+      },
+      {
+        "method": "PUT",
+        "path": "/api/pages/doc-eb594109a0537b25763b4caf",
+        "status": 403,
+        "requestKeys": [
+          "markdown",
+          "baseRevision"
+        ]
+      },
+      {
+        "method": "PUT",
+        "path": "/api/spaces/collaboration-lab/members/bff58c24-d132-4a36-9496-f11cc3cd93a5",
+        "status": 200,
+        "requestKeys": [
+          "role"
+        ]
+      }
+    ]
+  }
+}

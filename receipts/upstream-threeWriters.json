@@ -1,0 +1,96 @@
+{
+  "case": "threeWriters",
+  "status": "FAIL",
+  "agentGitCommit": "755ccea24807e229ed1386339fd6fa04e4846388",
+  "normalSyncStatus": "clean",
+  "mergedBody": "# Three writers\n\nFirst: old.\n\nStatus: draft.\n\nMiddle: original.\n\nMCP field: changed by API agent.\n\nGit field: changed in repository.\n\nLast: old.\n\nBrowser note: preserve my sentence.\n",
+  "bodyAfterUndo": "# Three writers\n\nFirst: old.\n\nStatus: draft.\n\nMiddle: original.\n\nMCP field: changed by API agent.\n\nGit field: changed in repository.\n\nLast: old.\n\nBrowser note: preserve my sentence.\n",
+  "undoRemovedOnlyBrowserSentence": false,
+  "remoteGitContainsAllChecks": true,
+  "markdown": "# Three writers\n\nFirst: old.\n\nStatus: draft.\n\nMiddle: original.\n\nMCP field: changed by API agent.\n\nGit field: changed in repository.\n\nLast: old.\n\nBrowser note: preserve my sentence.\n",
+  "fileSha256": "f8d007e22485031cbbd7927dbf8ecabd0ad28e637f0d8200d11ce6aae2667594",
+  "restMcpMatch": true,
+  "reloadRetainsChecks": true,
+  "httpTrace": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200,
+      "requestKeys": [
+        "email",
+        "password"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/spaces/collaboration-lab/sync",
+      "status": 200,
+      "requestKeys": []
+    },
+    {
+      "method": "POST",
+      "path": "/api/spaces/collaboration-lab/sync",
+      "status": 200,
+      "requestKeys": []
+    },
+    {
+      "method": "GET",
+      "path": "/api/pages/doc-7c00fbbdc510deed3c4e66ff",
+      "status": 200,
+      "requestKeys": []
+    }
+  ],
+  "mcpTrace": [
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "update_page",
+      "inputKeys": [
+        "id",
+        "markdown",
+        "baseRevision"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    }
+  ],
+  "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+  "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+  "sourceHashes": {
+    "server/collab.ts": "30c92220814f5a2a3a8f7aab36dcc91b40409a24ab355510a44217d78cb8752e",
+    "server/gitSync.ts": "b3f11144f5510c1019bfca9ba6851778ba77a7ec7b24583fb2abde2a9cd347e4",
+    "server/mcp.ts": "41e888051e9d6de3cb3c3c015f9bd533b54f0e8bf676a96bf2d797de17d06813",
+    "server/routes.ts": "6f73dcec8c940d2e87407b930f342d415e42fd15be8f917a52e83e9d4b36cfc9",
+    "shared/contracts.ts": "588169ff7dc931bf5a2e2625818119d774764dd366c444b0d53e5a5ae2f5b3d1",
+    "package-lock.json": "e7c3d79e625c5ce4bb1a15346927bf7ca8cef4db23b448b7f7e569ec11233c4f"
+  },
+  "syntheticOnly": true,
+  "noFaultInjection": true,
+  "realBrowserKeyboard": true,
+  "realHttpMcp": true
+}

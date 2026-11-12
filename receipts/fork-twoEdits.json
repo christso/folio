@@ -1,0 +1,87 @@
+{
+  "case": "twoEdits",
+  "status": "PASS",
+  "scope": "Maintained fork control: exact-range update for twoEdits; native baseRevision for other cases. No backend manipulation.",
+  "browserSentence": "Browser note: keep this sentence.",
+  "bodyBeforeApi": "# Two edits\n\nFirst: old.\n\nStatus: draft.\n\nMiddle: original.\nBrowser note: keep this sentence.\n\nMCP field: original.\n\nGit field: original.\n\nLast: old.\n",
+  "bodyAfterApi": "# Two edits\n\nFirst: new.\n\nStatus: draft.\n\nMiddle: original.\nBrowser note: keep this sentence.\n\nMCP field: original.\n\nGit field: original.\n\nLast: new.\n",
+  "bodyAfterUndo": "# Two edits\n\nFirst: new.\n\nStatus: draft.\n\nMiddle: original.\n\nMCP field: original.\n\nGit field: original.\n\nLast: new.\n",
+  "undoRemovedOwnSentence": true,
+  "agentChangeRetained": true,
+  "redoRetainsSentence": true,
+  "markdown": "# Two edits\n\nFirst: new.\n\nStatus: draft.\n\nMiddle: original.\nBrowser note: keep this sentence.\n\nMCP field: original.\n\nGit field: original.\n\nLast: new.\n",
+  "fileSha256": "a1d86f8e40d95a129e4450c5aae7d5f84b08ba7d71b1fdbbcf3b1a4e79bb0314",
+  "restMcpMatch": true,
+  "reloadRetainsChecks": true,
+  "staleCheck": null,
+  "httpTrace": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200,
+      "requestKeys": [
+        "email",
+        "password"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/pages/doc-e10d4e2c110f8cb5404c7f6f",
+      "status": 200,
+      "requestKeys": []
+    }
+  ],
+  "mcpTrace": [
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "update_page",
+      "inputKeys": [
+        "id",
+        "expectedRevision",
+        "edits"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    }
+  ],
+  "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+  "fixedCommit": "2e048814d1ea83fa6d3d03285d6e330b52a010e5",
+  "sourceHashes": {
+    "server/collab.ts": "019fa49b4a2117b8c11508907f1c820881a040ffa63bb0bea73f34ec3bcbc992",
+    "server/gitSync.ts": "b3f11144f5510c1019bfca9ba6851778ba77a7ec7b24583fb2abde2a9cd347e4",
+    "server/mcp.ts": "3bac60370cbf13e58bc1da8dcc2eee15e8fa7806bb9dd894e189929b9f1cb357",
+    "server/routes.ts": "049abc58b800919f4dddb66f24ac9db453f63cb701ae1c9036c04a9127a8ef8d",
+    "shared/contracts.ts": "b50c725b16d718cb4caa23e524c74f07f3dec27b9c1b4084628ee375830a551f",
+    "package-lock.json": "e7c3d79e625c5ce4bb1a15346927bf7ca8cef4db23b448b7f7e569ec11233c4f"
+  },
+  "syntheticOnly": true,
+  "noFaultInjection": true,
+  "realBrowserKeyboard": true,
+  "realHttpMcp": true
+}

@@ -1,0 +1,25 @@
+{
+  "rawSeconds": 12.9,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "UPSTREAM + PR14 | gitConflict\nReal browser, real HTTP MCP and separate Git clone/HTTP remote. No injected failures."
+    },
+    {
+      "at": 4.023435064999999,
+      "text": "Browser and Git agent independently change the SAME status line.\nUse normal POST /api/spaces/:space/sync (the Sync now operation)."
+    },
+    {
+      "at": 6.096303692,
+      "text": "PASS: conflict is visible with BOTH versions; unresolved merge was NOT pushed.\nAgent reads it and explicitly resolves to retain both reviewers\u2019 statuses."
+    },
+    {
+      "at": 10.634810792,
+      "text": "PASS: explicit MCP resolution + Sync publishes the resolved file.\nReload, browser, REST, MCP, current file and remote Git all retain the resolution."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. PASS: unresolved Git conflict is visible and not pushed. Explicit MCP resolution and normal Sync publish both retained statuses.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}

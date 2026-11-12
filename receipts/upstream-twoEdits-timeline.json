@@ -1,0 +1,29 @@
+{
+  "rawSeconds": 15.1,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "UPSTREAM + PR14 | twoEdits\nOrdinary browser typing and native revision-guarded API/MCP. No injected failure."
+    },
+    {
+      "at": 3.652282969,
+      "text": "Browser sentence is BETWEEN two unchanged target words.\nAgent reads current body and changes First and Last in ONE guarded request."
+    },
+    {
+      "at": 5.720886713,
+      "text": "Both browser and agent changes are visible.\nPress Ctrl+Z in the editor to undo the browser sentence."
+    },
+    {
+      "at": 8.611935362,
+      "text": "LIMITATION: Undo does NOT remove the browser sentence between the two agent edits."
+    },
+    {
+      "at": 12.462423525,
+      "text": "Reload, REST, HTTP MCP and current Markdown file agree.\nTwo separated edits still span the unchanged middle: PR14 does not provide exact ranges."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. LIMITATION: one guarded whole-body request changing two distant words prevents Undo of the browser sentence between them. Data retained.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}

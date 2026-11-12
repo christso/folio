@@ -1,0 +1,29 @@
+{
+  "rawSeconds": 15.3,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "UPSTREAM + PR14 | gitUndoFinalNewline\nReal browser, real HTTP MCP and separate Git clone/HTTP remote. No injected failures."
+    },
+    {
+      "at": 4.085711138,
+      "text": "Browser sentence is present. A separate Git clone changes only Status, commits and pushes."
+    },
+    {
+      "at": 5.957112694,
+      "text": "PASS: normal Sync retains all independent edits and publishes them to remote Git.\nNow press Ctrl+Z on the still-open browser to check local Undo."
+    },
+    {
+      "at": 9.198375173,
+      "text": "PASS: browser Undo removes only its own sentence; Git/API edits remain."
+    },
+    {
+      "at": 12.735300321999999,
+      "text": "Reload + real readbacks agree, including the remote Git file.\nGit and ordinary browser/API edits coexist with useful Undo."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. CONTROL: type Enter after the browser sentence. The same Git sync now preserves Undo. All edits remain after Redo/reload/Git readback.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}

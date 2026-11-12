@@ -1,0 +1,21 @@
+{
+  "rawSeconds": 9.1,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "UPSTREAM + PR14 | quote\nNative browser, REST and HTTP MCP actions only. No storage failure injection."
+    },
+    {
+      "at": 3.7439150940000006,
+      "text": "PASS: client rereads, confirms the quotation is unique, then uses native baseRevision.\nThe requested passage changes while the newer browser sentence remains."
+    },
+    {
+      "at": 6.922243355000001,
+      "text": "PASS: absent or ambiguous quotations are refused by client preflight, without another PUT.\nThis replaces one-passage functionality, not atomic location fences or save receipts."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. PASS: native client rereads a unique quote and uses baseRevision; newer browser typing elsewhere survives. Absent/ambiguous quotes stop before PUT.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}

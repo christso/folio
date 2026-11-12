@@ -1,0 +1,25 @@
+{
+  "rawSeconds": 11.8,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "UPSTREAM + PR14 | twoEditsSequential\nOrdinary browser typing and native revision-guarded API/MCP. No injected failure."
+    },
+    {
+      "at": 3.5023556259999995,
+      "text": "Browser sentence is BETWEEN two unchanged target words.\nAgent changes First and Last; sequential control uses two fresh guarded requests."
+    },
+    {
+      "at": 5.652724008,
+      "text": "Both browser and agent changes are visible.\nPress Ctrl+Z in the editor to undo the browser sentence."
+    },
+    {
+      "at": 8.542001786,
+      "text": "PASS: Undo removes only the browser sentence; the agent change remains."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. PASS: TWO separate guarded native requests preserve browser Undo between the changes. These requests are NOT atomic together.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}

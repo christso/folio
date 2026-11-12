@@ -1,0 +1,25 @@
+{
+  "rawSeconds": 11.7,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "UPSTREAM + PR14 | restUndo\nOrdinary browser typing and native revision-guarded API/MCP. No injected failure."
+    },
+    {
+      "at": 3.5337448910000004,
+      "text": "Browser sentence confirmed by MCP read.\nAgent changes only Status using the freshly read baseRevision."
+    },
+    {
+      "at": 5.638189558,
+      "text": "Both browser and agent changes are visible.\nPress Ctrl+Z in the editor to undo the browser sentence."
+    },
+    {
+      "at": 8.544162271,
+      "text": "PASS: Undo removes only the browser sentence; the agent change remains."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. PASS: native REST edit preserves browser Undo/Redo and agent change. Reload, REST, MCP and current file agree.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}

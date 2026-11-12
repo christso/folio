@@ -1,0 +1,29 @@
+{
+  "rawSeconds": 15.9,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "MAINTAINED FORK CONTROL | twoEdits\nOrdinary browser typing and native revision-guarded API/MCP. No injected failure."
+    },
+    {
+      "at": 3.5496870320000005,
+      "text": "Browser sentence is BETWEEN two unchanged target words.\nFork agent uses TWO exact ranges, guarded by its read revision."
+    },
+    {
+      "at": 5.651533831000001,
+      "text": "Both browser and agent changes are visible.\nPress Ctrl+Z in the editor to undo the browser sentence."
+    },
+    {
+      "at": 8.559328499,
+      "text": "PASS: Undo removes only the browser sentence; the agent change remains."
+    },
+    {
+      "at": 13.226340121,
+      "text": "Reload, REST, HTTP MCP and current Markdown file agree.\nOrdinary single-passage API editing preserves useful Undo."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. FORK CONTROL: exact-range API preserves Undo between the two changed words. Upstream lacks this atomic exact-range request.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}

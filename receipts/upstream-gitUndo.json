@@ -1,0 +1,87 @@
+{
+  "case": "gitUndo",
+  "status": "FAIL",
+  "agentGitCommit": "bec5c8c125aabf301611fa556e471825ba9191df",
+  "normalSyncStatus": "clean",
+  "mergedBody": "# Git Undo\n\nFirst: old.\n\nStatus: git-reviewed.\n\nMiddle: original.\n\nMCP field: original.\n\nGit field: original.\n\nLast: old.\n\nBrowser note: preserve my sentence.\n",
+  "bodyAfterUndo": "# Git Undo\n\nFirst: old.\n\nStatus: git-reviewed.\n\nMiddle: original.\n\nMCP field: original.\n\nGit field: original.\n\nLast: old.\n\nBrowser note: preserve my sentence.\n",
+  "undoRemovedOnlyBrowserSentence": false,
+  "remoteGitContainsAllChecks": true,
+  "markdown": "# Git Undo\n\nFirst: old.\n\nStatus: git-reviewed.\n\nMiddle: original.\n\nMCP field: original.\n\nGit field: original.\n\nLast: old.\n\nBrowser note: preserve my sentence.\n",
+  "fileSha256": "cdac92ca35dd791b496af860f14b85c4cf1df9c191cf9069377cfd5671ca772b",
+  "restMcpMatch": true,
+  "reloadRetainsChecks": true,
+  "httpTrace": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200,
+      "requestKeys": [
+        "email",
+        "password"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/spaces/collaboration-lab/sync",
+      "status": 200,
+      "requestKeys": []
+    },
+    {
+      "method": "POST",
+      "path": "/api/spaces/collaboration-lab/sync",
+      "status": 200,
+      "requestKeys": []
+    },
+    {
+      "method": "GET",
+      "path": "/api/pages/doc-8108d746344a444741f55d50",
+      "status": 200,
+      "requestKeys": []
+    }
+  ],
+  "mcpTrace": [
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    },
+    {
+      "name": "read_page",
+      "inputKeys": [
+        "id"
+      ],
+      "isError": false
+    }
+  ],
+  "baseline": "94f4e0a6e9f83bd84f80ae097e47910242b7bd99",
+  "fixedCommit": "c5545fdfed40cf421bd44dc8716d71c3cd8b2f21",
+  "sourceHashes": {
+    "server/collab.ts": "30c92220814f5a2a3a8f7aab36dcc91b40409a24ab355510a44217d78cb8752e",
+    "server/gitSync.ts": "b3f11144f5510c1019bfca9ba6851778ba77a7ec7b24583fb2abde2a9cd347e4",
+    "server/mcp.ts": "41e888051e9d6de3cb3c3c015f9bd533b54f0e8bf676a96bf2d797de17d06813",
+    "server/routes.ts": "6f73dcec8c940d2e87407b930f342d415e42fd15be8f917a52e83e9d4b36cfc9",
+    "shared/contracts.ts": "588169ff7dc931bf5a2e2625818119d774764dd366c444b0d53e5a5ae2f5b3d1",
+    "package-lock.json": "e7c3d79e625c5ce4bb1a15346927bf7ca8cef4db23b448b7f7e569ec11233c4f"
+  },
+  "syntheticOnly": true,
+  "noFaultInjection": true,
+  "realBrowserKeyboard": true,
+  "realHttpMcp": true
+}

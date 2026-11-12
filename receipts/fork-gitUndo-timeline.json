@@ -1,0 +1,25 @@
+{
+  "rawSeconds": 10.5,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "MAINTAINED FORK CONTROL | gitUndo\nReal browser, real HTTP MCP and separate Git clone/HTTP remote. No injected failures."
+    },
+    {
+      "at": 3.6986961630000006,
+      "text": "Browser sentence is present. A separate Git clone changes only Status, commits and pushes."
+    },
+    {
+      "at": 5.551283736,
+      "text": "PASS: normal Sync retains all independent edits and publishes them to remote Git.\nNow press Ctrl+Z on the still-open browser to check local Undo."
+    },
+    {
+      "at": 8.786299943000001,
+      "text": "FAIL: browser sentence cannot be undone after Git sync."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. LIMITATION: normal Git sync retains both edits but local Undo is ineffective. This also reproduces in the maintained fork.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}

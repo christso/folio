@@ -1,0 +1,25 @@
+{
+  "rawSeconds": 10.8,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "UPSTREAM + PR14 | threeWriters\nReal browser, real HTTP MCP and separate Git clone/HTTP remote. No injected failures."
+    },
+    {
+      "at": 3.746602983,
+      "text": "Browser sentence and MCP edit are live.\nSeparate Git clone changes a different field, commits and pushes."
+    },
+    {
+      "at": 5.725198192,
+      "text": "PASS: normal Sync retains all independent edits and publishes them to remote Git.\nNow press Ctrl+Z on the still-open browser to check local Undo."
+    },
+    {
+      "at": 8.933039776999998,
+      "text": "FAIL: browser sentence cannot be undone after Git sync."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. Browser, HTTP MCP and separate Git clone edits all survive Sync and remote publication. Local Undo is ineffective in this no-final-newline case.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}

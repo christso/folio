@@ -1,0 +1,17 @@
+{
+  "rawSeconds": 10.1,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "UPSTREAM + PR14 | Two independent real browser sessions\nBoth edit the same synthetic page using native keyboard input."
+    },
+    {
+      "at": 3.9886688560000003,
+      "text": "PASS: both simultaneous sentences appear ONCE in both browsers.\nReload, REST, MCP and current-file checks follow."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. PASS: two independent browser sessions type concurrently. Each sentence occurs once; both browsers retain them after reload.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}

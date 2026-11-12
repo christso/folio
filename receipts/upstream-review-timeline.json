@@ -1,0 +1,17 @@
+{
+  "rawSeconds": 5.6,
+  "speed": 1,
+  "captions": [
+    {
+      "at": 0,
+      "text": "UPSTREAM + PR14 | review\nNative browser, REST and HTTP MCP actions only. No storage failure injection."
+    },
+    {
+      "at": 3.552484079,
+      "text": "MCP submitted ONE proposal in review mode. Current page is unchanged.\nOpen the real review dialog and click Accept."
+    }
+  ],
+  "heldResultScreenshotSeconds": 10,
+  "heldCaption": "Actual result screenshot held. PASS: native MCP proposal leaves page unchanged until real browser Accept. Approval retains browser sentence; reload/readbacks agree.",
+  "note": "Real browser capture, followed by a labelled actual result screenshot held for readability. API/Git/file readbacks asserted in separate receipts. No simulated UI or injected storage failure."
+}
