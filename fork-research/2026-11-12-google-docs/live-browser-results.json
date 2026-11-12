@@ -1,0 +1,98 @@
+{
+  "date": "2026-11-12",
+  "browser": "Chrome 151.0.7922.77 on Linux; signed in by owner, then operated through agent-browser real keyboard input",
+  "scope": "Two synthetic single-paragraph tabs in one Google Doc. One API identity. No private algorithm, general industry behavior, arbitrary document structure, or latency claim.",
+  "native_replacement": {
+    "before": "First: old. Browser note: keep this sentence. Middle: original. Last: old.\n",
+    "requests": [
+      {
+        "replaceAllText": {
+          "containsText": {
+            "text": "First: old. Browser note: keep this sentence. Middle: original. Last: old.",
+            "matchCase": true
+          },
+          "replaceText": "First: new. Browser note: keep this sentence. Middle: original. Last: new.",
+          "tabsCriteria": {
+            "tabIds": [
+              "<test-tab>"
+            ]
+          }
+        }
+      }
+    ],
+    "revision_guard": "requiredRevisionId from the immediately preceding complete read",
+    "occurrences_changed": 1,
+    "after_api": "First: new. Browser note: keep this sentence. Middle: original. Last: new.\n",
+    "after_undo": "First: new. Browser note: keep this sentence. Middle: original. Last: new.\n",
+    "observations": {
+      "sentenceRemains": true,
+      "agentEditsRetained": true,
+      "exactPostReplacementBodyUnchanged": true
+    },
+    "visible_before_undo": true,
+    "survived_reload": true
+  },
+  "two_targeted_ranges": {
+    "before": "First: old. Browser note: keep this sentence. Middle: original. Last: old.\n",
+    "requests": [
+      {
+        "deleteContentRange": {
+          "range": {
+            "startIndex": 71,
+            "endIndex": 74,
+            "tabId": "<test-tab>"
+          }
+        }
+      },
+      {
+        "insertText": {
+          "location": {
+            "index": 71,
+            "tabId": "<test-tab>"
+          },
+          "text": "new"
+        }
+      },
+      {
+        "deleteContentRange": {
+          "range": {
+            "startIndex": 8,
+            "endIndex": 11,
+            "tabId": "<test-tab>"
+          }
+        }
+      },
+      {
+        "insertText": {
+          "location": {
+            "index": 8,
+            "tabId": "<test-tab>"
+          },
+          "text": "new"
+        }
+      }
+    ],
+    "revision_guard": "requiredRevisionId from the immediately preceding complete read",
+    "after_api": "First: new. Browser note: keep this sentence. Middle: original. Last: new.\n",
+    "after_undo": "First: new. Middle: original. Last: new.\n",
+    "after_redo": "First: new. Browser note: keep this sentence. Middle: original. Last: new.\n",
+    "undo_assertions": {
+      "browserSentenceRemoved": true,
+      "bothAgentEditsRetained": true
+    },
+    "redo_assertions": {
+      "browserSentenceRestored": true,
+      "bothAgentEditsRetained": true,
+      "exactPostAPIBodyRestored": true
+    },
+    "visible_before_undo": true,
+    "survived_reload": true,
+    "readback_timing": "Immediate API read after Ctrl+Y still showed the Undo state. A later read confirmed Redo after propagation; no second Redo was sent."
+  },
+  "evidence": "Real browser video and screenshots inspected; independent native API readbacks. Private raw captures and editor-only MP4 exports were not added to this branch.",
+  "private_receipt_sha256": {
+    "native-replacement-live-receipt.json": "da98d3d5bfb323bbb904353581014c5afd83d92efccae22238336b36006339ae",
+    "two-ranges-live-receipt.json": "0179449d673661e56dbd5d3d47570f878c8ce2620706101ab631277667670ff6",
+    "live-final-readback.json": "07bcb4391770e83095426916a67d06c758d7ee3c38af431c01bb595bcf87c334"
+  }
+}

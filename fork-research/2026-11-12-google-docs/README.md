@@ -64,6 +64,51 @@ documents multiple requests applied atomically in request order. Its
 distinguishes strict revision checking from transformation against a recent
 revision. These references establish API contracts, not browser Undo semantics.
 
+## Signed-in browser follow-up
+
+After the owner signed into a disposable agent-browser session, the agent ran
+both cases directly in Chrome 151.0.7922.77 on Linux. Each started in its own
+synthetic tab with this single paragraph:
+
+```text
+First: old. Middle: original. Last: old.
+```
+
+Real browser keyboard input inserted `Browser note: keep this sentence. `
+after `First: old. `. A native API read confirmed that insertion before the
+API changed both `old` words to `new`. Both changes were visibly confirmed in
+the browser before Ctrl+Z. The browser was not reloaded between typing and Undo.
+
+| API operation | Browser Undo of the middle sentence | Redo | Final reload |
+| --- | --- | --- | --- |
+| One native `replaceAllText` request matching the entire paragraph, retaining the middle sentence in its replacement string | Did not remove it; both API changes remained | Not used to infer success after ineffective Undo | Exact replacement retained |
+| Two separate word-range mutations in one atomic batch | Removed it; both API changes remained | Restored it; both API changes remained | Exact post-API text retained |
+
+The first case did not explicitly request separate deletion and insertion of
+the whole body. It gave Google's native replacement operation one old paragraph
+and one new paragraph. Its visible Undo result still did not preserve the
+browser insertion in the unchanged middle. That is evidence about this
+operation's behavior, not proof of Google's internal diff algorithm.
+
+The targeted control used four ordered requests: delete/insert the final word,
+then delete/insert the first word, all under the same `requiredRevisionId`.
+The initial read immediately after Ctrl+Y still showed the Undo state; a later
+read confirmed Redo after propagation. No second Redo was sent. Assertions
+therefore use the settled readback, not the first response.
+
+[Sanitized requests, bodies, assertions and receipt digests](live-browser-results.json)
+record the exact comparison. To repeat it, use a fresh synthetic paragraph and
+a fresh browser insertion for each case, substitute the actual tab and revision
+IDs, then send the recorded requests. Verify the API changes are visible before
+Undo and wait for readback to catch up after browser input.
+
+Private recordings were cropped to the synthetic editor text and captioned.
+The raw recordings, screenshots, editor-only MP4s and REA metadata remain
+private; no Google account or document identifiers are published here. REA
+connected to the selected Docs target and inspected page metadata; no captured
+client source or proprietary server implementation is claimed. The temporary
+browser, viewer and local login profile were closed and removed after the tests.
+
 ## Two separate edits in Folio
 
 PR #14 uses the existing
@@ -96,9 +141,12 @@ node fork-research/2026-11-12-google-docs/google-docs-two-edits.mjs /absolute/pa
 
 ## What parity would require
 
-Google Docs accepts separate range requests in a single atomic batch. Those
-requests need not explicitly delete the unchanged middle. We have not yet run
-the two-location Google Docs browser Undo test, so its outcome remains untested.
+Google Docs accepts separate range requests in a single atomic batch. The
+signed-in browser control above confirmed Undo/Redo preservation between two
+such edits in this case. A native replacement matching the entire paragraph
+did not preserve that behavior. Automatic multi-span diffing in Folio would
+add convenience to its whole-body API; this comparison does not establish that
+Google offers the same automatic behavior.
 
 The fork already accepts multiple exact ranges against one strict revision,
 and applies only those ranges. PR #14 alone does not expose that API upstream.
@@ -114,11 +162,13 @@ does not expand PR #14 or claim that work is implemented.
 
 ## Evidence limits and provenance
 
-The owner performed browser actions; the agent independently read back saved
-content. There is no Google Docs MP4, authenticated REA source capture, cursor
-measurement or proof of Google's private algorithms. The existing Folio PR
-videos demonstrate Folio only. No production Folio service or private record
-was used or changed.
+The initial tests used owner-performed browser actions and independent API
+readbacks. The follow-up used real browser automation after owner login,
+private recordings and independent API readbacks. No authenticated REA source
+capture, cursor measurement or proof of Google's private algorithms is
+claimed. Google Docs recordings remain private; the public Folio PR videos
+demonstrate Folio only. No production Folio service or private record was
+used or changed.
 
 Raw connected-API receipts remain in private runtime storage. Their SHA-256
 digests identify the records without publishing document or revision IDs:
