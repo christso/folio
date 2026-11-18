@@ -44,7 +44,7 @@ import { docIndexText, docIndexTextAsync } from './indexText.js';
 import { CANVAS_MAX_BYTES, canvasSearchText, parseJsonCanvas } from '../shared/canvas/index.js';
 import { inlineMarkdownToPlainText } from '../shared/inlineText.js';
 import { docExtOf, isMdxPath, isStrongIndexName, stripDocExt } from '../shared/mdx.js';
-import { computeVerification, hasVerificationProps, pickVerificationProps, type VerificationProps } from '../shared/verification.js';
+import { computeVerification, hasVerificationProps, pickVerificationProps, VERIFICATION_KEYS, type VerificationProps } from '../shared/verification.js';
 import { carryFrontmatterKeys, mergeFrontmatter, writeFrontmatterKeys, type FolioFrontmatter, type FrontmatterKeyEdit } from './frontmatter.js';
 import * as propsSidecar from './propsSidecar.js';
 import { ownProperties, reservedKeysOf } from './reservedPropertyKeys.js';
@@ -695,11 +695,13 @@ interface PagesIndexRow {
   frontmatter?: unknown;
 }
 
-// Bulk structural reads need neither indexed content nor search vectors. Keep only the frontmatter
-// keys rowToEntry uses, so a large unrelated property cannot inflate a tree or navigation read either.
+const ENTRY_VERIFICATION_FRONTMATTER = VERIFICATION_KEYS.map((key) => `CASE
+  WHEN frontmatter->'${key}' IS NULL THEN '{}'::jsonb
+  ELSE jsonb_build_object('${key}', frontmatter->'${key}')
+END`).join(' || ');
+
 const ENTRY_METADATA_COLUMNS = `id, space_slug, path, kind, title, sort_order, status, icon, cover,
-  updated_at, is_index, jsonb_build_object('owner', frontmatter->'owner',
-    'verified', frontmatter->'verified', 'review_by', frontmatter->'review_by') AS frontmatter`;
+  updated_at, is_index, (${ENTRY_VERIFICATION_FRONTMATTER}) AS frontmatter`;
 
 function rowToEntry(row: PagesIndexRow): PageIndexEntry {
   const relPath = row.path;
@@ -2371,6 +2373,14 @@ export async function requireEntry(id: string): Promise<PageIndexEntry> {
 export async function getEntryIdByExactPath(space: string, relPath: string): Promise<string | undefined> {
   const row = await queryOne<{ id: string }>('SELECT id FROM pages_index WHERE space_slug = $1 AND path = $2', [space, relPath]);
   return row?.id;
+}
+
+export async function getEntryByExactPath(space: string, relPath: string): Promise<PageIndexEntry | undefined> {
+  const row = await queryOne<PagesIndexRow>(
+    `SELECT ${ENTRY_METADATA_COLUMNS}, plain_text FROM pages_index WHERE space_slug = $1 AND path = $2`,
+    [space, relPath],
+  );
+  return row ? rowToEntry(row) : undefined;
 }
 
 /**

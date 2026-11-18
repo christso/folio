@@ -33,8 +33,7 @@ export interface WritingRules {
 
 /** The rules page entry of `space`, or undefined. Only a document counts (a board or table named the same is not a rules page). */
 export async function findWritingRulesEntry(space: string): Promise<PageIndexEntry | undefined> {
-  const id = await storage.getEntryIdByExactPath(space, WRITING_RULES_PATH);
-  const entry = id ? await storage.getEntry(id) : undefined;
+  const entry = await storage.getEntryByExactPath(space, WRITING_RULES_PATH);
   return entry?.kind === 'doc' ? entry : undefined;
 }
 
