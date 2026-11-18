@@ -33,7 +33,9 @@ export interface WritingRules {
 
 /** The rules page entry of `space`, or undefined. Only a document counts (a board or table named the same is not a rules page). */
 export async function findWritingRulesEntry(space: string): Promise<PageIndexEntry | undefined> {
-  return (await storage.listEntries(space)).find((e) => e.relPath === WRITING_RULES_PATH && e.kind === 'doc');
+  const id = await storage.getEntryIdByExactPath(space, WRITING_RULES_PATH);
+  const entry = id ? await storage.getEntry(id) : undefined;
+  return entry?.kind === 'doc' ? entry : undefined;
 }
 
 /** Current text of a document: what is on screen when someone is editing it live, else the file. */

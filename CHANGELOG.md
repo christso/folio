@@ -6,6 +6,7 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
 
 ### Fixed
 
+- Large spaces can load their page tree without fetching every page's indexed text and search vector into server memory (reported in #19). Structural listings keep ordering, access filtering and verification badges; article content and search indexes are unchanged.
 - Browser Undo keeps working after an agent edits several separate passages of a page through REST/MCP (reported in #18).
 
 ### Changed
