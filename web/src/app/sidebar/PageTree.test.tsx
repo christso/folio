@@ -255,7 +255,39 @@ describe('PageTree in a wide folder', () => {
     expect(last.closest('[role="treeitem"]')?.getAttribute('aria-posinset')).toBe('500');
     fireEvent.keyDown(last, { key: 'Home' });
     await waitFor(() => expect(document.activeElement?.getAttribute('data-tree-page-id')).toBe('manual'));
+    const parent = document.activeElement as HTMLElement;
+    fireEvent.keyDown(parent, { key: 'ArrowLeft' });
+    await waitFor(() => expect(screen.queryByText('Page 0')).toBeNull());
+    fireEvent.keyDown(parent, { key: 'ArrowRight' });
+    const child = (await screen.findByText('Page 0')).closest('[data-tree-page-id]')!;
+    fireEvent.keyDown(parent, { key: 'ArrowRight' });
+    await waitFor(() => expect(document.activeElement).toBe(child));
+    fireEvent.keyDown(child, { key: 'ArrowLeft' });
+    await waitFor(() => expect(document.activeElement).toBe(parent));
     expect(container.querySelectorAll('[data-tree-page-id]').length).toBeLessThan(100);
+  });
+
+  it('leaves modified navigation keys available to the browser', async () => {
+    mountWide();
+    const parent = (await screen.findByText('Manual')).closest('[data-tree-page-id]')!;
+    for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
+      const event = new KeyboardEvent('keydown', { key: 'ArrowLeft', [modifier]: true, bubbles: true, cancelable: true });
+      fireEvent(parent, event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(screen.getByText('Page 0')).toBeTruthy();
+    }
+  });
+
+  it('Tab from the last mounted page controls reaches the next offscreen page', async () => {
+    const { container } = mountWide();
+    await screen.findByText('Page 0');
+    const last = [...container.querySelectorAll<HTMLElement>('[data-tree-row-index]')].at(-1)!;
+    const index = Number(last.dataset.treeRowIndex);
+    const button = [...last.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')].at(-1)!;
+    button.focus();
+    fireEvent.keyDown(button, { key: 'Tab' });
+    await waitFor(() => expect(document.activeElement?.closest<HTMLElement>('[data-tree-row-index]')?.dataset.treeRowIndex).toBe(String(index + 1)));
+    expect(document.activeElement?.hasAttribute('data-tree-page-id')).toBe(true);
   });
 
   it('Shift+Tab from the first mounted row reaches the previous offscreen page controls', async () => {

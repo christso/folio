@@ -104,6 +104,7 @@ export function VirtualTreeRows({ nodes, scrollTo, ...props }: Props) {
       className="relative"
       style={virtual ? { height: virtualizer.getTotalSize() } : undefined}
       onKeyDown={(event) => {
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
         const target = event.target as HTMLElement;
         const wrapper = target.closest<HTMLElement>('[data-tree-row-index]');
         if (!wrapper || target.matches('input, textarea, [contenteditable="true"]')) return;
