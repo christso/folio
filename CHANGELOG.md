@@ -4,6 +4,18 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
 
 ## [Unreleased]
 
+### Fixed
+
+- Large spaces can load their page tree without fetching every page's indexed text and search vector into server memory (reported in #19). Structural listings keep ordering, access filtering and verification badges; article content and search indexes are unchanged.
+- Browser Undo keeps working after an agent edits several separate passages of a page through REST/MCP (reported in #18).
+
+### Changed
+
+- **The assistant gets ready when you open it**, so the first answer starts
+  sooner. Opening the panel or switching conversation prepares the agent
+  in the background without sending anything to the model, so it costs no
+  tokens; unused, it is released after five minutes.
+
 ## [0.4.5] - 2026-11-09
 
 Folio AI can run on Claude through an Anthropic API key, next to Cursor. Adds

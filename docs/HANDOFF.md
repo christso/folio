@@ -36,6 +36,14 @@ endpoints. A restart resets them, and a second process would count on its own.
 
 ### Pages and files
 
+Bulk structural reads use `storage.listEntryMetadata`: tree, templates, subtree,
+move/copy/rename discovery, file-reference checks and navigation lookups fetch
+metadata and only the three verification properties, never indexed text or search
+vectors. `listEntries` keeps complete indexed bodies for content consumers but
+omits search vectors and unrelated frontmatter. The regression in `storage.test.ts`
+inspects actual PostgreSQL result rows and their payload size: dropping content
+only while serializing the tree response does not prevent heap exhaustion (#19).
+
 | Kind | File | Notes |
 |---|---|---|
 | Document | `*.md` | Title is the first `#` heading. Front matter holds Folio's own keys (`id`, `order`, `status`, `icon`, `cover`); keys written by other tools are kept as they are. A space bound to a folder of a repository writes no `id` at all (see "Spaces inside a product repository") |
