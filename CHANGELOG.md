@@ -6,6 +6,7 @@ Notable changes to Folio. Versions follow [Semantic Versioning](https://semver.o
 
 ### Fixed
 
+- Large expanded sidebar folders mount only the rows around the viewport, keeping article navigation responsive. Offscreen edits and dialogs, drag sources, active-page reveal and keyboard navigation remain available; duplicate sibling labels are resolved once per folder.
 - Large spaces can load their page tree without fetching every page's indexed text and search vector into server memory (reported in #19). Structural listings keep ordering, access filtering and verification badges; article content and search indexes are unchanged.
 - Browser Undo keeps working after an agent edits several separate passages of a page through REST/MCP (reported in #18).
 

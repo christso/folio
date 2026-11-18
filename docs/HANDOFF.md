@@ -44,6 +44,17 @@ omits search vectors and unrelated frontmatter. The regression in `storage.test.
 inspects actual PostgreSQL result rows and their payload size: dropping content
 only while serializing the tree response does not prevent heap exhaustion (#19).
 
+The signed-in sidebar flattens expanded branches and, above 100 visible rows,
+mounts only the current viewport plus eight rows on each side. It shares the
+existing navigation scroll surface with templates, agent rules, tags and graph;
+all entries remain in the tree model. `VirtualTreeRows` preserves focused and
+dragged rows, in-progress edits, dialogs and pending actions while they are offscreen.
+Reveal first scrolls by the flattened index, then keeps the existing nearest/center
+row behavior. Arrow keys, Home/End and Tab can reach rows outside the viewport.
+Sibling labels are resolved together by `treeNodeDisplayTitles`; do not reintroduce
+a scan of every sibling inside each row's render. `PageTree.test.tsx` checks bounded
+mounts, last-row reveal, keyboard access and edit/dialog retention in a wide folder.
+
 | Kind | File | Notes |
 |---|---|---|
 | Document | `*.md` | Title is the first `#` heading. Front matter holds Folio's own keys (`id`, `order`, `status`, `icon`, `cover`); keys written by other tools are kept as they are. A space bound to a folder of a repository writes no `id` at all (see "Spaces inside a product repository") |
